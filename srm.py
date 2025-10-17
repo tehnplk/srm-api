@@ -29,6 +29,7 @@ def ensure_srm_check_table(conn) -> None:
                 maininscl_name VARCHAR(255) NULL,
                 subinscl VARCHAR(255) NULL,
                 subinscl_name VARCHAR(255) NULL,
+                card_id VARCHAR(255) NULL,
                 death_date DATE NULL,
                 status VARCHAR(255) NULL
             ) CHARACTER SET tis620 COLLATE tis620_thai_ci
@@ -101,6 +102,7 @@ def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Opti
     maininscl_name = None
     subinscl_id = None
     subinscl_name = None
+    card_id = None
     try:
         if isinstance(funds, list) and funds:
             f0 = funds[0]
@@ -110,15 +112,16 @@ def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Opti
             maininscl_name = (main.get('name') or None)
             subinscl_id = (sub.get('id') or None)
             subinscl_name = (sub.get('name') or None)
+            card_id = f0.get('cardId') or None
     except Exception:
-        maininscl_id = maininscl_name = subinscl_id = subinscl_name = None
+        maininscl_id = maininscl_name = subinscl_id = subinscl_name = card_id = None
     with conn.cursor() as cur:
         cur.execute(
             """
-            REPLACE INTO srm_check (cid, check_date, fund, maininscl, maininscl_name, subinscl, subinscl_name, death_date, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            REPLACE INTO srm_check (cid, check_date, fund, maininscl, maininscl_name, subinscl, subinscl_name, card_id, death_date, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (cid, norm_dt, fund_text, maininscl_id, maininscl_name, subinscl_id, subinscl_name, norm_death, None if status is None else str(status))
+            (cid, norm_dt, fund_text, maininscl_id, maininscl_name, subinscl_id, subinscl_name, card_id, norm_death, None if status is None else str(status))
         )
     conn.commit()
 
