@@ -25,7 +25,10 @@ def ensure_srm_check_table(conn) -> None:
                 cid VARCHAR(20) PRIMARY KEY,
                 check_date DATETIME NULL,
                 fund TEXT NULL,
+                maininscl VARCHAR(255) NULL,
+                maininscl_name VARCHAR(255) NULL,
                 subinscl VARCHAR(255) NULL,
+                subinscl_name VARCHAR(255) NULL,
                 death_date DATE NULL
             ) CHARACTER SET tis620 COLLATE tis620_thai_ci
             """
@@ -92,21 +95,29 @@ def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Opti
     norm_dt = _normalize_check_date(check_date)
     norm_death = _normalize_death_date(death_date)
     fund_text = json.dumps(funds or [], ensure_ascii=False)
-    # Extract subInscl from first fund record, prefer id then name
-    subinscl_val = None
+    # Extract from the first fund record (can change to latest if desired)
+    maininscl_id = None
+    maininscl_name = None
+    subinscl_id = None
+    subinscl_name = None
     try:
         if isinstance(funds, list) and funds:
-            sub = funds[0].get('subInscl') or {}
-            subinscl_val = sub.get('id') or sub.get('name')
+            f0 = funds[0]
+            main = f0.get('mainInscl') or {}
+            sub = f0.get('subInscl') or {}
+            maininscl_id = (main.get('id') or None)
+            maininscl_name = (main.get('name') or None)
+            subinscl_id = (sub.get('id') or None)
+            subinscl_name = (sub.get('name') or None)
     except Exception:
-        subinscl_val = None
+        maininscl_id = maininscl_name = subinscl_id = subinscl_name = None
     with conn.cursor() as cur:
         cur.execute(
             """
-            REPLACE INTO srm_check (cid, check_date, fund, subinscl, death_date)
-            VALUES (%s, %s, %s, %s, %s)
+            REPLACE INTO srm_check (cid, check_date, fund, maininscl, maininscl_name, subinscl, subinscl_name, death_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (cid, norm_dt, fund_text, subinscl_val, norm_death)
+            (cid, norm_dt, fund_text, maininscl_id, maininscl_name, subinscl_id, subinscl_name, norm_death)
         )
     conn.commit()
 
