@@ -2,7 +2,7 @@ import sys
 from typing import List, Any
 
 from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QInputDialog, QMenu, QAbstractItemView
-from PyQt6.QtCore import QSettings, Qt, QSortFilterProxyModel, QRegularExpression, QObject, pyqtSignal, QThread, QCoreApplication
+from PyQt6.QtCore import QSettings, Qt, QSortFilterProxyModel, QRegularExpression, QObject, pyqtSignal, QThread, QCoreApplication, QTimer
 from PyQt6.QtGui import QGuiApplication
 from datetime import datetime
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
@@ -39,6 +39,12 @@ class Patient(QWidget, Patient_ui):
 
         # Initial load
         self.load_patients()
+        # After load, mark rows already checked today
+        try:
+            self.proxy.modelReset.connect(self._mark_checked_today_in_view)
+        except Exception:
+            pass
+        QTimer.singleShot(0, self._mark_checked_today_in_view)
 
         # Wire rights check button
         self.check_rights_button.clicked.connect(self.check_rights)
@@ -251,7 +257,7 @@ class Patient(QWidget, Patient_ui):
                             check_date = data.get('checkDate')
                             funds = data.get('funds', [])
                             death_date = data.get('deathDate')
-                            upsert_srm_check(db_conn, cid, check_date, death_date, funds)
+                            upsert_srm_check(db_conn, cid, check_date, death_date, funds, resp.status_code)
                             if isinstance(death_date, str) and death_date.strip():
                                 update_patient_death(db_conn, cid)
                             succeeded += 1
@@ -351,6 +357,55 @@ class Patient(QWidget, Patient_ui):
         self._stop_worker()
         super().closeEvent(event)
 
+    def _mark_checked_today_in_view(self):
+        # Batch query srm_check for today's checked CIDs and tick the checkbox in column 0
+        try:
+            row_count = self.proxy.rowCount()
+            if row_count == 0:
+                return
+            # Collect CIDs and map cid -> list of proxy rows
+            cid_rows = {}
+            for r in range(row_count):
+                idx = self.proxy.index(r, self.cid_col)
+                cid = idx.data()
+                if cid:
+                    cid_rows.setdefault(str(cid), []).append(r)
+            if not cid_rows:
+                return
+            # Query in batches
+            import pymysql
+            cfg = self._get_db_config()
+            conn = pymysql.connect(**cfg)
+            ensure_srm_check_table(conn)
+            checked_today = set()
+            cids = list(cid_rows.keys())
+            B = 500
+            with conn.cursor() as cur:
+                for i in range(0, len(cids), B):
+                    chunk = cids[i:i+B]
+                    placeholders = ",".join(["%s"] * len(chunk))
+                    sql = f"SELECT cid FROM srm_check WHERE DATE(check_date)=CURDATE() AND cid IN ({placeholders})"
+                    cur.execute(sql, chunk)
+                    for row in cur.fetchall() or []:
+                        checked_today.add(str(row[0]))
+            try:
+                conn.close()
+            except Exception:
+                pass
+            if not checked_today:
+                return
+            # Tick checkboxes for matched rows
+            for cid, proxy_rows in cid_rows.items():
+                if cid in checked_today:
+                    for pr in proxy_rows:
+                        chk_idx = self.proxy.mapToSource(self.proxy.index(pr, 0))
+                        item = self.proxy.sourceModel().item(chk_idx.row(), 0)
+                        if item and item.isCheckable():
+                            item.setCheckState(Qt.CheckState.Checked)
+        except Exception:
+            # Fail silently to avoid blocking UI
+            pass
+
         
 
 
@@ -359,3 +414,11 @@ if __name__ == "__main__":
     window = Patient()
     window.show()
     sys.exit(app.exec())
+
+# Helper: mark already-checked-today rows
+def _safe_iter(val):
+    try:
+        return iter(val)
+    except Exception:
+        return iter(())
+

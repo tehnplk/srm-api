@@ -2,7 +2,7 @@ import requests
 import json
 import os
 
-pid = "3650100810895"
+pid = "0074809006255"
 #pid = "3650100810887"
 #pid = "1101401192332"
 url = f"https://srm.nhso.go.th/api/ucws/v1/right-search?pid={pid}"

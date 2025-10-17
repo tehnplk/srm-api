@@ -29,7 +29,8 @@ def ensure_srm_check_table(conn) -> None:
                 maininscl_name VARCHAR(255) NULL,
                 subinscl VARCHAR(255) NULL,
                 subinscl_name VARCHAR(255) NULL,
-                death_date DATE NULL
+                death_date DATE NULL,
+                status VARCHAR(255) NULL
             ) CHARACTER SET tis620 COLLATE tis620_thai_ci
             """
         )
@@ -91,7 +92,7 @@ def _normalize_death_date(death_date: Optional[str]) -> Optional[str]:
     return None
 
 
-def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Optional[str], funds: list) -> None:
+def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Optional[str], funds: list, status: Optional[int] = None) -> None:
     norm_dt = _normalize_check_date(check_date)
     norm_death = _normalize_death_date(death_date)
     fund_text = json.dumps(funds or [], ensure_ascii=False)
@@ -114,10 +115,10 @@ def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Opti
     with conn.cursor() as cur:
         cur.execute(
             """
-            REPLACE INTO srm_check (cid, check_date, fund, maininscl, maininscl_name, subinscl, subinscl_name, death_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            REPLACE INTO srm_check (cid, check_date, fund, maininscl, maininscl_name, subinscl, subinscl_name, death_date, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (cid, norm_dt, fund_text, maininscl_id, maininscl_name, subinscl_id, subinscl_name, norm_death)
+            (cid, norm_dt, fund_text, maininscl_id, maininscl_name, subinscl_id, subinscl_name, norm_death, None if status is None else str(status))
         )
     conn.commit()
 
