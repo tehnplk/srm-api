@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QSizePolicy,
+    QComboBox,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -57,6 +58,12 @@ class Setting_ui(object):
             widget.setMinimumWidth(380)
             widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             widget.setFont(QFont("Segoe UI", 12))
+
+        # System
+        self.system_combo = QComboBox(Setting_ui)
+        self.system_combo.addItems(["jhcis", "hosxp"])
+        apply_input_sizing(self.system_combo)
+        self.form_layout.addRow(QLabel("ระบบ:"), self.system_combo)
 
         # Host
         self.host_edit = QLineEdit(Setting_ui)

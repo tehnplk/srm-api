@@ -3,7 +3,6 @@ import json
 from datetime import datetime
 from typing import Optional
 
-import pymysql
 import requests
 
 
@@ -52,19 +51,67 @@ def was_checked_today(conn, cid: str) -> bool:
         return bool(row)
 
 
+def _has_hosxp_death_flag(conn) -> bool:
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1 FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'patient'
+                  AND COLUMN_NAME = 'death'
+                LIMIT 1
+                """
+            )
+            return bool(cur.fetchone())
+    except Exception:
+        return False
+
+
 def is_patient_dead(conn, cid: str) -> bool:
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT death FROM patient WHERE cid=%s LIMIT 1
-            """,
-            (cid,)
-        )
-        row = cur.fetchone()
-        if not row:
-            return False
-        death_val = row[0]
-        return isinstance(death_val, str) and death_val.upper() == 'Y'
+        if _has_hosxp_death_flag(conn):
+            cur.execute(
+                """
+                SELECT death FROM patient WHERE cid=%s LIMIT 1
+                """,
+                (cid,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return False
+            death_val = row[0]
+            return isinstance(death_val, str) and death_val.upper() == 'Y'
+        else:
+            # JHCIS: check person.dischargetype (9 = dead)
+            try:
+                cur.execute(
+                    """
+                    SELECT 1 FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'person'
+                      AND COLUMN_NAME = 'dischargetype'
+                    LIMIT 1
+                    """
+                )
+                if not cur.fetchone():
+                    return False
+                cur.execute(
+                    """
+                    SELECT dischargetype FROM person WHERE idcard=%s LIMIT 1
+                    """,
+                    (cid,)
+                )
+                row = cur.fetchone()
+                if not row:
+                    return False
+                dt = row[0]
+                if dt is None:
+                    return False
+                # Consider dead when dischargetype is not '9'
+                return str(dt).strip() != '9'
+            except Exception:
+                return False
 
 
 def _normalize_check_date(check_date: Optional[str]) -> Optional[str]:
@@ -127,6 +174,9 @@ def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Opti
 
 
 def update_patient_death(conn, cid: str) -> None:
+    # Only update for HOSxP schema with patient.death flag
+    if not _has_hosxp_death_flag(conn):
+        return
     with conn.cursor() as cur:
         cur.execute(
             """

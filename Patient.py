@@ -76,13 +76,34 @@ class Patient(QWidget, Patient_ui):
         cfg = self._get_db_config()
         conn = pymysql.connect(**cfg)
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT cid, pname, fname, lname, pttype, pttype_no
-                FROM patient
-                WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
-                """
-            )
+            system = str(self.settings.value("system", "jhcis")).strip().lower()
+            if system == "jhcis":
+                # JHCIS: map to expected headers, join ctitle to resolve prename title
+                cur.execute(
+                    """
+                    SELECT 
+                        p.idcard          AS cid,
+                        t.titlename       AS pname,
+                        p.fname           AS fname,
+                        p.lname           AS lname,
+                        p.rightcode       AS pttype,
+                        p.rightno         AS pttype_no
+                    FROM person p
+                    LEFT JOIN ctitle t ON p.prename = t.titlecode
+                    WHERE CHAR_LENGTH(p.idcard) = 13 
+                      AND p.idcard REGEXP '^[0-9]{13}$'
+                      AND (p.dischargedate IS NULL OR p.dischargedate = '0000-00-00')
+                    """
+                )
+            else:
+                # HOSxP default
+                cur.execute(
+                    """
+                    SELECT cid, pname, fname, lname, pttype, pttype_no
+                    FROM patient
+                    WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
+                    """
+                )
             rows = cur.fetchall()
             headers = [col[0] for col in cur.description]
         conn.close()

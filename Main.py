@@ -16,7 +16,7 @@ class Main(QMainWindow, Main_ui):
 
         # Set window icon
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        icon_path = os.path.join(script_dir, "app_icon.ico")
+        icon_path = os.path.join(script_dir, "check.png")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
@@ -120,6 +120,11 @@ if __name__ == "__main__":
     app.setApplicationName("SRM API")
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("SRM Team")
+    # Set application icon
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    icon_path = os.path.join(script_dir, "check.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
     
     window = Main()
     window.show()

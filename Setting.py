@@ -38,6 +38,7 @@ class Setting(QWidget, Setting_ui):
             "password": self.password_edit.text(),
             "connect_timeout": int(self.timeout_spin.value()),
             "charset": "utf8mb4",
+            "system": self.system_combo.currentText(),
         }
 
     def validate_required(self) -> bool:
@@ -90,6 +91,7 @@ class Setting(QWidget, Setting_ui):
             self.settings.setValue("user", cfg["user"])
             self.settings.setValue("password", cfg["password"])
             self.settings.setValue("timeout", cfg["connect_timeout"])
+            self.settings.setValue("system", cfg["system"])
             self.settings.sync()
             QMessageBox.information(self, "บันทึกแล้ว", "บันทึกการตั้งค่าเรียบร้อย")
         except Exception as e:
@@ -103,6 +105,7 @@ class Setting(QWidget, Setting_ui):
             user = self.settings.value("user", "")
             password = self.settings.value("password", "")
             timeout = int(self.settings.value("timeout", 10))
+            system = self.settings.value("system", "jhcis")
 
             self.host_edit.setText(host)
             self.port_spin.setValue(port)
@@ -110,6 +113,12 @@ class Setting(QWidget, Setting_ui):
             self.username_edit.setText(user)
             self.password_edit.setText(password)
             self.timeout_spin.setValue(timeout)
+            # set current system selection safely
+            idx = self.system_combo.findText(system)
+            if idx >= 0:
+                self.system_combo.setCurrentIndex(idx)
+            else:
+                self.system_combo.setCurrentIndex(0)
         except Exception as e:
             QMessageBox.critical(self, "ผิดพลาด", f"โหลดการตั้งค่าล้มเหลว: {e}")
 
