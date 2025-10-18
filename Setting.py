@@ -1,7 +1,7 @@
 import sys
 from typing import Dict
 
-from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox
+from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QMdiSubWindow
 from PyQt6.QtCore import QSettings, QLocale
 
 from Setting_ui import Setting_ui
@@ -24,7 +24,7 @@ class Setting(QWidget, Setting_ui):
         self.test_button.clicked.connect(self.test_connection)
         self.save_button.clicked.connect(self.save_settings)
         self.load_button.clicked.connect(self.load_settings)
-        self.cancel_button.clicked.connect(self.close)
+        self.cancel_button.clicked.connect(self.on_cancel)
 
         # Load on start
         self.load_settings()
@@ -121,6 +121,21 @@ class Setting(QWidget, Setting_ui):
                 self.system_combo.setCurrentIndex(0)
         except Exception as e:
             QMessageBox.critical(self, "ผิดพลาด", f"โหลดการตั้งค่าล้มเหลว: {e}")
+
+    def on_cancel(self):
+        """Close the Settings window, ensuring MDI subwindow wrapper is closed."""
+        try:
+            # Find the QMdiSubWindow ancestor and close it only
+            w = self
+            while w is not None and not isinstance(w, QMdiSubWindow):
+                w = w.parent()
+            if isinstance(w, QMdiSubWindow):
+                w.close()
+            else:
+                # Not in MDI: just close this widget
+                self.close()
+        except Exception:
+            self.close()
 
 
 if __name__ == "__main__":

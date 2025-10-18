@@ -18,7 +18,7 @@ print(refresh_token)
 url = "https://srm.nhso.go.th/api/scard/access-token"
 
 headers = {
-    "Content-Type": "application/x-www-form-urlencoded"
+    #"Content-Type": "application/x-www-form-urlencoded"
 }
 
 data = {
