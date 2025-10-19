@@ -322,7 +322,11 @@ class Patient(QWidget, Patient_ui):
                             death_date = data.get('deathDate')
                             upsert_srm_check(db_conn, cid, check_date, death_date, funds, resp.status_code)
                             if isinstance(death_date, str) and death_date.strip():
-                                update_patient_death(db_conn, cid)
+                                try:
+                                    _update_patient_death_from_api(db_conn, cid, death_date)
+                                except Exception:
+                                    # fail-soft; do not block the loop
+                                    pass
                             succeeded += 1
                         else:
                             failed += 1
@@ -467,6 +471,48 @@ class Patient(QWidget, Patient_ui):
                 self._thread.wait(3000)
             except Exception:
                 pass
+
+    # --- DB helpers for death update ---
+    def _column_exists(self, conn, table: str, column: str) -> bool:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME=%s AND COLUMN_NAME=%s
+                    """,
+                    (table, column),
+                )
+                return cur.fetchone() is not None
+        except Exception:
+            return False
+
+    def _update_patient_death_from_api(self, conn, cid: str, death_date: str):
+        if not (isinstance(death_date, str) and death_date.strip()):
+            return
+        # Normalize death_date to YYYY-MM-DD
+        dd = death_date.strip()
+        try:
+            if len(dd) > 10:
+                dd = dd[:10]
+        except Exception:
+            pass
+        # Build SET clause depending on column existence
+        sets = ["death='Y'", "deathday=%s"]
+        params = [dd, cid]
+        has_lastupdate = self._column_exists(conn, 'patient', 'lastupdate')
+        has_last_update = self._column_exists(conn, 'patient', 'last_update')
+        if has_lastupdate:
+            sets.append("lastupdate=NOW()")
+        if has_last_update:
+            sets.append("last_update=NOW()")
+        sql = f"UPDATE patient SET {', '.join(sets)} WHERE cid=%s"
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+        try:
+            conn.commit()
+        except Exception:
+            pass
 
     def closeEvent(self, event):
         # Ensure background thread is stopped when window closes
