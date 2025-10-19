@@ -47,6 +47,13 @@ class Main_ui(object):
         self.actionPatient.setStatusTip("จัดการรายชื่อ")
         self.menuFile.addAction(self.actionPatient)
 
+        # ผู้รับบริการวันนี้ action
+        self.actionPatientToday = QAction(MainWindow)
+        self.actionPatientToday.setObjectName("actionPatientToday")
+        self.actionPatientToday.setText("📅 ผู้รับบริการวันนี้")
+        self.actionPatientToday.setStatusTip("รายการผู้รับบริการที่ตรวจสิทธิวันนี้")
+        self.menuFile.addAction(self.actionPatientToday)
+
         # Separator
         self.menuFile.addSeparator()
 
@@ -104,6 +111,8 @@ class Main_ui(object):
 
         # Add ผู้ป่วย button to toolbar
         self.toolBar.addAction(self.actionPatient)
+        # Add ผู้รับบริการวันนี้ button to toolbar
+        self.toolBar.addAction(self.actionPatientToday)
         # Add ตั้งค่า button to toolbar
         self.toolBar.addAction(self.actionSetting)
 

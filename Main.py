@@ -22,6 +22,7 @@ class Main(QMainWindow, Main_ui):
 
         # Connect actions
         self.actionPatient.triggered.connect(self.show_patient)
+        self.actionPatientToday.triggered.connect(self.show_patient_today)
         self.actionSetting.triggered.connect(self.show_setting)
         self.actionAbout.triggered.connect(self.show_about)
         
@@ -68,6 +69,10 @@ class Main(QMainWindow, Main_ui):
         """Handle รายชื่อ/Patient menu action"""
         from Patient import Patient
         self.show_mdi_child(Patient, "📋 รายชื่อ", parent=self)
+
+    def show_patient_today(self):
+        from PatientToday import PatientToday
+        self.show_mdi_child(PatientToday, "📅 ผู้รับบริการวันนี้", parent=self)
 
     def show_setting(self):
         """Handle ตั้งค่า menu action"""
