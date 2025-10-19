@@ -16,6 +16,7 @@ from srm import (
     upsert_srm_check,
     update_patient_death,
     call_right_search,
+    refresh_token,
 )
 
 
@@ -27,7 +28,7 @@ class Patient(QWidget, Patient_ui):
         self.settings = QSettings("SRM_API", "MySQL_Settings")
 
         # Wire events
-        self.refresh_button.clicked.connect(self.load_patients)
+        self.refresh_button.clicked.connect(self.on_refresh_token)
         # Header context menu for filtering
         header = self.table.horizontalHeader()
         header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -199,6 +200,13 @@ class Patient(QWidget, Patient_ui):
                 if line.startswith('access-token='):
                     return line.split('=', 1)[1]
         raise ValueError('ไม่พบ access-token ในไฟล์ token.txt')
+
+    def on_refresh_token(self):
+        try:
+            new_tok = refresh_token()
+            QMessageBox.information(self, 'สำเร็จ', 'รีเฟรชโทเคนเรียบร้อยแล้ว')
+        except Exception as e:
+            QMessageBox.warning(self, 'ล้มเหลว', f'ไม่สามารถรีเฟรชโทเคนได้:\n{e}')
 
     def check_rights(self):
         import pymysql
