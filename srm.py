@@ -195,35 +195,62 @@ def call_right_search(token: str, cid: str) -> requests.Response:
 
 def refresh_token():
     token_file = os.path.join(os.environ['USERPROFILE'], 'SRM Smart Card Single Sign-On', 'token.txt')
+    # Read existing refresh-token from file
+    refresh_tok = None
     with open(token_file, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
             if line.startswith('refresh-token='):
-                refresh_token = line.split('=', 1)[1]
+                refresh_tok = line.split('=', 1)[1]
                 break
-        else:
-            raise ValueError("ไม่พบ refresh-token ในไฟล์")
+    if not refresh_tok:
+        raise ValueError("ไม่พบ refresh-token ในไฟล์")
 
-    print(refresh_token)
     url = "https://srmportal.nhso.go.th/api/scard/access-token"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    data = {"refresh_token": refresh_tok}
 
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
+    # Request new tokens
+    resp = requests.post(url, headers=headers, data=data)
 
-    data = {
-        "refresh_token": refresh_token
-    }
+    # Do not write file if error
+    if not resp.ok:
+        raise RuntimeError("การขอ token ใหม่เกิดข้อผิดพลาด")
 
-    print(f"กำลังขอ access token ใหม่ด้วย refresh token...")
+    text = (resp.text or "").strip()
 
-    response = requests.post(url, headers=headers, data=data)
-    new_access_token = response.text.strip()
-    print(new_access_token)
-    # เขียน new_access_token ทับไฟลืเก่าไปเลย
+    # Try JSON first
+    access_line = None
+    refresh_line = None
+    try:
+        js = resp.json()
+        # Accept common keys
+        acc = js.get('access_token') or js.get('access-token') or js.get('accessToken')
+        ref = js.get('refresh_token') or js.get('refresh-token') or js.get('refreshToken')
+        if acc:
+            access_line = f"access-token={acc}"
+        if ref:
+            refresh_line = f"refresh-token={ref}"
+    except Exception:
+        # Fallback: parse plain text lines
+        for ln in text.splitlines():
+            s = ln.strip()
+            if s.startswith('access-token=') and not access_line:
+                access_line = s
+            elif s.startswith('refresh-token=') and not refresh_line:
+                refresh_line = s
+
+    if not access_line:
+        # No valid access token, do not overwrite file
+        raise RuntimeError("การขอ token ใหม่เกิดข้อผิดพลาด")
+
+    # Write back only normalized lines we have
+    out_lines = [access_line]
+    if refresh_line:
+        out_lines.append(refresh_line)
     with open(token_file, 'w', encoding='utf-8') as f:
-        f.write(f"{new_access_token}\n")
+        f.write("\n".join(out_lines) + "\n")
 
-    return new_access_token
+    return access_line.split('=', 1)[1]
 
 

@@ -229,12 +229,12 @@ class Patient(QWidget, Patient_ui):
         try:
             new_tok = refresh_token()
             QMessageBox.information(self, 'สำเร็จ', 'รีเฟรชโทเคนเรียบร้อยแล้ว')
-        except Exception as e:
-            QMessageBox.warning(self, 'ล้มเหลว', f'ไม่สามารถรีเฟรชโทเคนได้:\n{e}')
+        except Exception:
+            QMessageBox.warning(self, 'ล้มเหลว', 'การขอ token ใหม่เกิดข้อผิดพลาด')
 
     def check_rights(self):
         import pymysql
-
+        
         # Determine cid column in proxy coordinates
         if getattr(self, 'cid_col', -1) < 0:
             QMessageBox.warning(self, 'ไม่พบคอลัมน์', 'ไม่พบคอลัมน์ cid ในผลลัพธ์')
@@ -258,7 +258,14 @@ class Patient(QWidget, Patient_ui):
             return
 
         # Prepare worker thread
-        token = read_token()
+        try:
+            token = read_token()
+        except Exception:
+            try:
+                self._show_status('การขอ token ใหม่เกิดข้อผิดพลาด', 7000)
+            except Exception:
+                pass
+            return
         cfg = self._get_db_config()
 
         class RightsWorker(QObject):
@@ -387,9 +394,9 @@ class Patient(QWidget, Patient_ui):
                         # Refresh token now
                         from srm import refresh_token
                         refresh_token()
-                    except Exception as e:
+                    except Exception:
                         try:
-                            self._show_status(f'รีเฟรชโทเคนล้มเหลว: {e}', 7000)
+                            self._show_status('การขอ token ใหม่เกิดข้อผิดพลาด', 7000)
                         except Exception:
                             pass
                     else:
