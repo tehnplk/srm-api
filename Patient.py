@@ -98,13 +98,37 @@ class Patient(QWidget, Patient_ui):
                 )
             else:
                 # HOSxP default
-                cur.execute(
-                    """
-                    SELECT cid, pname, fname, lname, pttype, pttype_no
-                    FROM patient
-                    WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
-                    """
-                )
+                dead_cids = []
+                try:
+                    if _has_hosxp_death_flag(conn):
+                        cur.execute(
+                            """
+                            SELECT cid FROM patient
+                            WHERE death='Y' AND CHAR_LENGTH(cid)=13 AND cid REGEXP '^[0-9]{13}$'
+                            """
+                        )
+                        dead_cids = [str(r[0]) for r in (cur.fetchall() or []) if r and r[0]]
+                except Exception:
+                    dead_cids = []
+
+                if dead_cids:
+                    placeholders = ",".join(["%s"] * len(dead_cids))
+                    sql = (
+                        """
+                        SELECT cid, pname, fname, lname, pttype, pttype_no
+                        FROM patient
+                        WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
+                          AND cid NOT IN (""" + placeholders + ")"
+                    )
+                    cur.execute(sql, dead_cids)
+                else:
+                    cur.execute(
+                        """
+                        SELECT cid, pname, fname, lname, pttype, pttype_no
+                        FROM patient
+                        WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
+                        """
+                    )
             rows = cur.fetchall()
             headers = [col[0] for col in cur.description]
         conn.close()
@@ -224,6 +248,11 @@ class Patient(QWidget, Patient_ui):
             if val:
                 rows.append((row, str(val)))
 
+        # Determine resume position if any (continue from where stopped)
+        start_from = getattr(self, '_resume_from', 0)
+        if isinstance(start_from, int) and start_from > 0:
+            rows = [(pr, cid) for pr, cid in rows if pr >= start_from]
+
         if not rows:
             QMessageBox.information(self, 'ไม่มีข้อมูล', 'ไม่มีข้อมูลสำหรับตรวจสอบสิทธิ')
             return
@@ -236,6 +265,7 @@ class Patient(QWidget, Patient_ui):
             progress_row = pyqtSignal(int)
             mark_checked = pyqtSignal(int)
             finished_summary = pyqtSignal(int, int, int, int, bool)  # skipped_today, skipped_dead, succeeded, failed, token_expired
+            need_resume_from = pyqtSignal(int)  # row index to resume from when token expired
             def __init__(self):
                 super().__init__()
                 self._stop = False
@@ -273,6 +303,10 @@ class Patient(QWidget, Patient_ui):
                         # print(cid, resp.json())  # optional debug
                         if resp.status_code == 401:
                             token_expired = True
+                            try:
+                                self.need_resume_from.emit(proxy_row)
+                            except RuntimeError:
+                                pass
                             break
                         if resp.status_code == 200:
                             try:
@@ -335,9 +369,48 @@ class Patient(QWidget, Patient_ui):
             ]
             summary_text = "\n".join(summary_lines)
             if token_expired:
-                QMessageBox.warning(self, 'สรุปการตรวจสอบสิทธิ', summary_text + "\n\nหยุดเนื่องจาก Token หมดอายุ")
+                # Notify token expired via status bar
+                try:
+                    self._show_status("Token หมดอายุ กำลังรีเฟรชโทเคนอัตโนมัติ...", 7000)
+                except Exception:
+                    pass
+                # Retry guard to avoid infinite loops
+                if not hasattr(self, '_retry_after_refresh'):
+                    self._retry_after_refresh = False
+                if not self._retry_after_refresh:
+                    self._retry_after_refresh = True
+                    try:
+                        # Refresh token now
+                        from srm import refresh_token
+                        refresh_token()
+                    except Exception as e:
+                        try:
+                            self._show_status(f'รีเฟรชโทเคนล้มเหลว: {e}', 7000)
+                        except Exception:
+                            pass
+                    else:
+                        # Continue after 5 seconds
+                        try:
+                            self._show_status('รีเฟรชโทเคนสำเร็จ กำลังตรวจสอบสิทธิต่อใน 5 วินาที...', 7000)
+                        except Exception:
+                            pass
+                        QTimer.singleShot(5000, self.check_rights)
+                else:
+                    try:
+                        self._show_status('พยายามรีเฟรชโทเคนแล้ว แต่ยังหมดอายุอยู่ ไม่ทำการลองซ้ำอีกครั้ง', 7000)
+                    except Exception:
+                        pass
             else:
-                QMessageBox.information(self, 'สรุปการตรวจสอบสิทธิ', summary_text)
+                # Reset resume and retry flags on successful completion
+                try:
+                    self._resume_from = 0
+                    self._retry_after_refresh = False
+                except Exception:
+                    pass
+                try:
+                    self._show_status('ตรวจสอบสิทธิเสร็จสิ้น', 5000)
+                except Exception:
+                    pass
             self._thread.quit()
             self._thread.wait()
             # Let Qt delete objects on thread finish; guard double-deletes
@@ -353,6 +426,12 @@ class Patient(QWidget, Patient_ui):
         self._worker.progress_row.connect(on_progress_row)
         self._worker.mark_checked.connect(on_mark_checked)
         self._worker.finished_summary.connect(on_finished_summary)
+        def on_need_resume_from(proxy_row: int):
+            try:
+                self._resume_from = int(proxy_row)
+            except Exception:
+                self._resume_from = 0
+        self._worker.need_resume_from.connect(on_need_resume_from)
 
         self._thread.start()
 
@@ -367,6 +446,14 @@ class Patient(QWidget, Patient_ui):
 
     def _on_about_to_quit(self):
         self._stop_worker()
+
+    def _show_status(self, text: str, timeout_ms: int = 5000):
+        try:
+            p = self.parent()
+            if p is not None and hasattr(p, 'statusbar') and p.statusbar is not None:
+                p.statusbar.showMessage(str(text), int(timeout_ms))
+        except Exception:
+            pass
 
     def _stop_worker(self):
         if hasattr(self, '_worker') and self._worker is not None:

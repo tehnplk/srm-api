@@ -55,7 +55,17 @@ class Main(QMainWindow, Main_ui):
             child = child_class(*args, **kwargs)
             sub_window = self.centralwidget.addSubWindow(child)
             sub_window.setWindowTitle(title)
-            sub_window.resize(800, 600)
+            # Desired size
+            w, h = 800, 600
+            sub_window.resize(w, h)
+            # Center within MDI area
+            try:
+                area_size = self.centralwidget.viewport().size()
+            except Exception:
+                area_size = self.centralwidget.size()
+            x = max(0, (area_size.width() - w) // 2)
+            y = max(0, (area_size.height() - h) // 2)
+            sub_window.move(x, y)
             sub_window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
             sub_window.show()
             
@@ -83,15 +93,15 @@ class Main(QMainWindow, Main_ui):
         """Show about dialog"""
         QMessageBox.about(
             self,
-            "เกี่ยวกับโปรแกรม",
+            "เกี่ยวกับ HisHelp",
             """
-            <h3>SRM API - ระบบจัดการข้อมูล</h3>
+            <h3>HisHelp - ระบบช่วยตรวจสอบสิทธิ</h3>
             <p><b>เวอร์ชัน:</b> 1.0.0</p>
             <p><b>พัฒนาโดย:</b> SRM Team</p>
-            <p><b>คำอธิบาย:</b> ระบบจัดการข้อมูลรายชื่อ</p>
+            <p><b>คำอธิบาย:</b> เครื่องมือช่วยตรวจสอบสิทธิ์และผู้รับบริการ</p>
             <p><b>เทคโนโลยี:</b> Python 3.12 + PyQt6</p>
             <hr>
-            <p><i>© 2024 SRM API. All rights reserved.</i></p>
+            <p><i>© 2024 HisHelp. All rights reserved.</i></p>
             """
         )
         self.statusbar.showMessage("แสดงข้อมูลเกี่ยวกับโปรแกรม")
@@ -122,7 +132,7 @@ class Main(QMainWindow, Main_ui):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setApplicationName("SRM API")
+    app.setApplicationName("HisHelp")
     app.setApplicationVersion("1.0.0")
     app.setOrganizationName("SRM Team")
     # Set application icon

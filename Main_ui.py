@@ -20,7 +20,7 @@ from PyQt6.QtCore import Qt, QSize
 class Main_ui(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.setWindowTitle("ตรวจสอบสิทธิด้วย SRM")
+        MainWindow.setWindowTitle("HisHelp")
         MainWindow.resize(1200, 800)
         
         # Create central widget (MDI Area)
