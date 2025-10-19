@@ -31,7 +31,7 @@ class Patient_ui(object):
         self.top_bar = QHBoxLayout()
         self.top_bar.setSpacing(8)
 
-        self.refresh_button = QPushButton("รีเฟรชข้อมูล", Patient_ui)
+        self.refresh_button = QPushButton("Refresh Token", Patient_ui)
         self.refresh_button.setMinimumWidth(140)
         self.refresh_button.setFont(QFont("Segoe UI", 11))
         self.top_bar.addWidget(self.refresh_button)
