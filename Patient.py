@@ -49,6 +49,11 @@ class Patient(QWidget, Patient_ui):
 
         # Wire rights check button
         self.check_rights_button.clicked.connect(self.check_rights)
+        # Wire stop button
+        try:
+            self.stop_rights_button.clicked.connect(self.on_stop_rights)
+        except Exception:
+            pass
 
     def _get_db_config(self):
         return {
@@ -137,12 +142,21 @@ class Patient(QWidget, Patient_ui):
 
     def _populate_table(self, headers: List[str], rows: List[tuple]):
         # Prepend a 'check' column
-        headers_with_check = ["check"] + headers
+        headers_with_check = ["check"] + headers + ["pttype_new", "pttype_no_new"]
         # Remember cid column index for context menu copy
         try:
             self.cid_col = headers_with_check.index("cid")
         except ValueError:
             self.cid_col = -1
+        # Remember new columns indices for later updates
+        try:
+            self.pttype_new_col = headers_with_check.index("pttype_new")
+        except ValueError:
+            self.pttype_new_col = -1
+        try:
+            self.pttype_no_new_col = headers_with_check.index("pttype_no_new")
+        except ValueError:
+            self.pttype_no_new_col = -1
         model = QStandardItemModel()
         model.setColumnCount(len(headers_with_check))
         model.setHorizontalHeaderLabels(headers_with_check)
@@ -165,6 +179,9 @@ class Patient(QWidget, Patient_ui):
                         text = repr(val)
                 it = QStandardItem(text)
                 items.append(it)
+            # Append placeholders for new columns
+            items.append(QStandardItem(""))
+            items.append(QStandardItem(""))
             model.appendRow(items)
 
         # Assign model via proxy for filtering/sorting
@@ -209,11 +226,21 @@ class Patient(QWidget, Patient_ui):
             return
         menu = QMenu(self)
         act_copy = menu.addAction("Copy CID")
+        act_check_single = menu.addAction("ตรวจสอบสิทธิ")
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_copy:
             value = index.data()
             if value is not None:
                 QGuiApplication.clipboard().setText(str(value))
+        elif chosen == act_check_single:
+            # Trigger rights check for this single CID
+            value = index.data()
+            if value is not None:
+                try:
+                    proxy_row = index.row()
+                    self._start_rights_worker([(proxy_row, str(value))], debug=True)
+                except Exception:
+                    pass
 
     def _read_token(self) -> str:
         import os
@@ -232,27 +259,13 @@ class Patient(QWidget, Patient_ui):
         except Exception:
             QMessageBox.warning(self, 'ล้มเหลว', 'การขอ token ใหม่เกิดข้อผิดพลาด')
 
-    def check_rights(self):
+    def _start_rights_worker(self, rows: List[tuple], debug: bool = False):
         import pymysql
         
         # Determine cid column in proxy coordinates
         if getattr(self, 'cid_col', -1) < 0:
             QMessageBox.warning(self, 'ไม่พบคอลัมน์', 'ไม่พบคอลัมน์ cid ในผลลัพธ์')
             return
-
-        # Build list of cids from current proxy model (proxy order)
-        rows = []
-        for row in range(self.proxy.rowCount()):
-            idx = self.proxy.index(row, self.cid_col)
-            val = idx.data()
-            if val:
-                rows.append((row, str(val)))
-
-        # Determine resume position if any (continue from where stopped)
-        start_from = getattr(self, '_resume_from', 0)
-        if isinstance(start_from, int) and start_from > 0:
-            rows = [(pr, cid) for pr, cid in rows if pr >= start_from]
-
         if not rows:
             QMessageBox.information(self, 'ไม่มีข้อมูล', 'ไม่มีข้อมูลสำหรับตรวจสอบสิทธิ')
             return
@@ -273,14 +286,18 @@ class Patient(QWidget, Patient_ui):
             mark_checked = pyqtSignal(int)
             finished_summary = pyqtSignal(int, int, int, int, bool)  # skipped_today, skipped_dead, succeeded, failed, token_expired
             need_resume_from = pyqtSignal(int)  # row index to resume from when token expired
-            def __init__(self):
+            update_rights = pyqtSignal(int, str, str, str)  # proxy_row, cid, pttype_new, pttype_no_new
+            debug_output = pyqtSignal(str, str)  # cid, text
+            def __init__(self, debug: bool = False):
                 super().__init__()
                 self._stop = False
+                self._debug = bool(debug)
             def request_stop(self):
                 self._stop = True
 
             def run(self):
                 import pymysql
+                import json
                 db_conn = pymysql.connect(**cfg)
                 ensure_srm_check_table(db_conn)
                 skipped_today = 0
@@ -315,6 +332,25 @@ class Patient(QWidget, Patient_ui):
                             except RuntimeError:
                                 pass
                             break
+                        if self._debug:
+                            try:
+                                print(f"[DEBUG] CID={cid} status={resp.status_code}")
+                                try:
+                                    js = json.dumps(resp.json(), ensure_ascii=False)
+                                    print(js)
+                                    try:
+                                        self.debug_output.emit(str(cid), js)
+                                    except Exception:
+                                        pass
+                                except Exception:
+                                    txt = resp.text
+                                    print(txt)
+                                    try:
+                                        self.debug_output.emit(str(cid), txt)
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
                         if resp.status_code == 200:
                             try:
                                 self.mark_checked.emit(proxy_row)
@@ -328,6 +364,37 @@ class Patient(QWidget, Patient_ui):
                             funds = data.get('funds', [])
                             death_date = data.get('deathDate')
                             upsert_srm_check(db_conn, cid, check_date, death_date, funds, resp.status_code)
+                            # Determine new pttype values directly from API response with fallbacks to funds[]
+                            new_type = ""
+                            new_no = ""
+                            try:
+                                # Prefer top-level fields if available
+                                subinscl_top = data.get('subinscl') or data.get('subInscl')
+                                cardid_top = data.get('cardId') or data.get('cardID')
+                                if subinscl_top:
+                                    if isinstance(subinscl_top, dict):
+                                        new_type = str(subinscl_top.get('id') or subinscl_top.get('name') or "")
+                                    else:
+                                        new_type = str(subinscl_top)
+                                if cardid_top:
+                                    new_no = str(cardid_top)
+
+                                # Fallback to first fund entry when top-level missing
+                                if (not new_type or not new_no) and isinstance(funds, list) and funds:
+                                    f0 = funds[0] if isinstance(funds[0], dict) else {}
+                                    if not new_type:
+                                        sub = f0.get('subInscl') if isinstance(f0.get('subInscl'), dict) else None
+                                        if sub:
+                                            new_type = str(sub.get('id') or sub.get('name') or "")
+                                    if not new_no:
+                                        new_no = str(f0.get('cardId') or f0.get('cardID') or "")
+                            except Exception:
+                                new_type = ""
+                                new_no = ""
+                            try:
+                                self.update_rights.emit(proxy_row, cid, new_type, new_no)
+                            except RuntimeError:
+                                pass
                             if isinstance(death_date, str) and death_date.strip():
                                 try:
                                     _update_patient_death_from_api(db_conn, cid, death_date)
@@ -349,8 +416,15 @@ class Patient(QWidget, Patient_ui):
                     except RuntimeError:
                         pass
 
+        # Remember rows for potential retry (e.g., token refresh)
+        try:
+            self._pending_rows = list(rows)
+        except Exception:
+            self._pending_rows = rows
+        self._pending_debug = bool(debug)
+
         self._thread = QThread(self)
-        self._worker = RightsWorker()
+        self._worker = RightsWorker(debug=debug)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
 
@@ -362,12 +436,41 @@ class Patient(QWidget, Patient_ui):
                 self.table.scrollTo(idx, QAbstractItemView.ScrollHint.PositionAtCenter)
             except Exception:
                 pass
+            try:
+                # Track current processing row for stop/resume
+                self._current_processing_row = int(proxy_row)
+            except Exception:
+                self._current_processing_row = proxy_row
 
         def on_mark_checked(proxy_row: int):
             chk_idx = self.proxy.mapToSource(self.proxy.index(proxy_row, 0))
             item = self.proxy.sourceModel().item(chk_idx.row(), 0)
             if item and item.isCheckable():
                 item.setCheckState(Qt.CheckState.Checked)
+
+        def on_update_rights(proxy_row: int, cid: str, pttype_new: str, pttype_no_new: str):
+            try:
+                # Find current proxy rows that match this CID to avoid stale proxy_row issues
+                rows_to_update = []
+                for r in range(self.proxy.rowCount()):
+                    idx = self.proxy.index(r, self.cid_col)
+                    if str(idx.data()) == str(cid):
+                        rows_to_update.append(r)
+                if not rows_to_update:
+                    rows_to_update = [proxy_row]
+                for pr in rows_to_update:
+                    if getattr(self, 'pttype_new_col', -1) >= 0:
+                        src_idx_type = self.proxy.mapToSource(self.proxy.index(pr, self.pttype_new_col))
+                        item_type = self.proxy.sourceModel().item(src_idx_type.row(), self.pttype_new_col)
+                        if item_type:
+                            item_type.setText(pttype_new or "")
+                    if getattr(self, 'pttype_no_new_col', -1) >= 0:
+                        src_idx_no = self.proxy.mapToSource(self.proxy.index(pr, self.pttype_no_new_col))
+                        item_no = self.proxy.sourceModel().item(src_idx_no.row(), self.pttype_no_new_col)
+                        if item_no:
+                            item_no.setText(pttype_no_new or "")
+            except Exception:
+                pass
 
         def on_finished_summary(skipped_today: int, skipped_dead: int, succeeded: int, failed: int, token_expired: bool):
             total_rows = self.proxy.rowCount()
@@ -400,12 +503,12 @@ class Patient(QWidget, Patient_ui):
                         except Exception:
                             pass
                     else:
-                        # Continue after 5 seconds
+                        # Continue after 5 seconds with the same pending rows
                         try:
                             self._show_status('รีเฟรชโทเคนสำเร็จ กำลังตรวจสอบสิทธิต่อใน 5 วินาที...', 7000)
                         except Exception:
                             pass
-                        QTimer.singleShot(5000, self.check_rights)
+                        QTimer.singleShot(5000, lambda: self._start_rights_worker(getattr(self, '_pending_rows', []), debug=getattr(self, '_pending_debug', False)))
                 else:
                     try:
                         self._show_status('พยายามรีเฟรชโทเคนแล้ว แต่ยังหมดอายุอยู่ ไม่ทำการลองซ้ำอีกครั้ง', 7000)
@@ -437,6 +540,15 @@ class Patient(QWidget, Patient_ui):
         self._worker.progress_row.connect(on_progress_row)
         self._worker.mark_checked.connect(on_mark_checked)
         self._worker.finished_summary.connect(on_finished_summary)
+        self._worker.update_rights.connect(on_update_rights)
+        def on_debug_output(cid: str, text: str):
+            try:
+                # Truncate very long outputs for dialog
+                preview = text if len(text) <= 4000 else (text[:4000] + "... [truncated]")
+                QMessageBox.information(self, f"API Response (CID: {cid})", preview)
+            except Exception:
+                pass
+        self._worker.debug_output.connect(on_debug_output)
         def on_need_resume_from(proxy_row: int):
             try:
                 self._resume_from = int(proxy_row)
@@ -454,6 +566,43 @@ class Patient(QWidget, Patient_ui):
             except Exception:
                 pass
             app.aboutToQuit.connect(self._on_about_to_quit)
+
+    def on_stop_rights(self):
+        # Set resume position to the current processing row, if known
+        try:
+            if hasattr(self, '_current_processing_row'):
+                self._resume_from = int(self._current_processing_row)
+        except Exception:
+            pass
+        # Stop the background worker and thread
+        self._stop_worker()
+        try:
+            self._show_status('หยุดการตรวจสอบสิทธิแล้ว', 4000)
+        except Exception:
+            pass
+
+    def check_rights(self):
+        import pymysql
+
+        # Determine cid column in proxy coordinates
+        if getattr(self, 'cid_col', -1) < 0:
+            QMessageBox.warning(self, 'ไม่พบคอลัมน์', 'ไม่พบคอลัมน์ cid ในผลลัพธ์')
+            return
+
+        # Build list of cids from current proxy model (proxy order)
+        rows = []
+        for row in range(self.proxy.rowCount()):
+            idx = self.proxy.index(row, self.cid_col)
+            val = idx.data()
+            if val:
+                rows.append((row, str(val)))
+
+        # Determine resume position if any (continue from where stopped)
+        start_from = getattr(self, '_resume_from', 0)
+        if isinstance(start_from, int) and start_from > 0:
+            rows = [(pr, cid) for pr, cid in rows if pr >= start_from]
+
+        self._start_rights_worker(rows)
 
     def _on_about_to_quit(self):
         self._stop_worker()

@@ -41,6 +41,11 @@ class Patient_ui(object):
         self.check_rights_button.setFont(QFont("Segoe UI", 11))
         self.top_bar.addWidget(self.check_rights_button)
 
+        self.stop_rights_button = QPushButton("⏹ หยุดตรวจสอบสิทธิ", Patient_ui)
+        self.stop_rights_button.setMinimumWidth(180)
+        self.stop_rights_button.setFont(QFont("Segoe UI", 11))
+        self.top_bar.addWidget(self.stop_rights_button)
+
         self.top_bar.addStretch(1)
         self.main_layout.addLayout(self.top_bar)
 
