@@ -1,0 +1,5 @@
+update person set pttype='89',pttype_begin_date='2025-05-01T14:16:41',pttype_expire_date='2055-10-07T23:59:59',pttype_hospmain='14972',pttype_hospsub='07479',pttype_no='N896541363895',last_update_pttype='2025-10-18 19:36:11' where cid='1659900724626'
+
+update patient set pttype='89' where cid='1659900724626'
+
+update ovst set pttype='89',pttypeno='N896541363895',hospmain='14972',hospsub='07479' where hn='000007173' and vstdate='2025-10-18'
