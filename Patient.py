@@ -238,7 +238,11 @@ class Patient(QWidget, Patient_ui):
             if value is not None:
                 try:
                     proxy_row = index.row()
-                    self._start_rights_worker([(proxy_row, str(value))], debug=True)
+                    try:
+                        print(f"[CLICK] Context-menu check requested for CID={value} at proxy_row={proxy_row}")
+                    except Exception:
+                        pass
+                    self._start_rights_worker([(proxy_row, str(value))], debug=True, force=True)
                 except Exception:
                     pass
 
@@ -259,7 +263,7 @@ class Patient(QWidget, Patient_ui):
         except Exception:
             QMessageBox.warning(self, 'ล้มเหลว', 'การขอ token ใหม่เกิดข้อผิดพลาด')
 
-    def _start_rights_worker(self, rows: List[tuple], debug: bool = False):
+    def _start_rights_worker(self, rows: List[tuple], debug: bool = False, force: bool = False):
         import pymysql
         
         # Determine cid column in proxy coordinates
@@ -287,11 +291,12 @@ class Patient(QWidget, Patient_ui):
             finished_summary = pyqtSignal(int, int, int, int, bool)  # skipped_today, skipped_dead, succeeded, failed, token_expired
             need_resume_from = pyqtSignal(int)  # row index to resume from when token expired
             update_rights = pyqtSignal(int, str, str, str)  # proxy_row, cid, pttype_new, pttype_no_new
-            debug_output = pyqtSignal(str, str)  # cid, text
-            def __init__(self, debug: bool = False):
+            def __init__(self, debug: bool = False, force: bool = False):
                 super().__init__()
                 self._stop = False
                 self._debug = bool(debug)
+                self._force_recheck = bool(force)
+                self._alerted_once = False
             def request_stop(self):
                 self._stop = True
 
@@ -308,49 +313,59 @@ class Patient(QWidget, Patient_ui):
                 try:
                     for proxy_row, cid in rows:
                         if self._stop:
+                            try:
+                                print(f"[SKIP] CID={cid} reason=stop_requested")
+                            except Exception:
+                                pass
                             break
                         try:
                             self.progress_row.emit(proxy_row)
                         except RuntimeError:
                             break
                         if is_patient_dead(db_conn, cid):
+                            try:
+                                print(f"[INFO] CID={cid} marked dead in DB; proceeding to call API as requested")
+                            except Exception:
+                                pass
                             skipped_dead += 1
-                            continue
-                        if was_checked_today(db_conn, cid):
+                        if (not self._force_recheck) and was_checked_today(db_conn, cid):
                             try:
                                 self.mark_checked.emit(proxy_row)
                             except RuntimeError:
                                 break
+                            try:
+                                print(f"[SKIP] CID={cid} reason=checked_today")
+                            except Exception:
+                                pass
                             skipped_today += 1
                             continue
                         resp = call_right_search(token, cid)
-                        # print(cid, resp.json())  # optional debug
+                        # For context-menu checks only (debug=True), print CID and response
+                        if self._debug:
+                            try:
+                                import json as _json
+                                try:
+                                    body_text = _json.dumps(resp.json(), ensure_ascii=False)
+                                except Exception:
+                                    body_text = resp.text
+                                try:
+                                    print(f"[API] CID={cid} status={resp.status_code}")
+                                    print(body_text)
+                                except Exception:
+                                    pass
+                            except Exception:
+                                pass
                         if resp.status_code == 401:
                             token_expired = True
+                            try:
+                                print(f"[STOP] CID={cid} reason=token_expired (status=401), will refresh and resume")
+                            except Exception:
+                                pass
                             try:
                                 self.need_resume_from.emit(proxy_row)
                             except RuntimeError:
                                 pass
                             break
-                        if self._debug:
-                            try:
-                                print(f"[DEBUG] CID={cid} status={resp.status_code}")
-                                try:
-                                    js = json.dumps(resp.json(), ensure_ascii=False)
-                                    print(js)
-                                    try:
-                                        self.debug_output.emit(str(cid), js)
-                                    except Exception:
-                                        pass
-                                except Exception:
-                                    txt = resp.text
-                                    print(txt)
-                                    try:
-                                        self.debug_output.emit(str(cid), txt)
-                                    except Exception:
-                                        pass
-                            except Exception:
-                                pass
                         if resp.status_code == 200:
                             try:
                                 self.mark_checked.emit(proxy_row)
@@ -362,7 +377,27 @@ class Patient(QWidget, Patient_ui):
                                 data = {}
                             check_date = data.get('checkDate')
                             funds = data.get('funds', [])
-                            death_date = data.get('deathDate')
+                            # Robust death date detection (top-level, casing variants, or inside funds[])
+                            death_date = data.get('deathDate') or data.get('deathdate') or data.get('death_date')
+                            if not (isinstance(death_date, str) and death_date.strip()) and isinstance(funds, list):
+                                try:
+                                    for f in funds:
+                                        if isinstance(f, dict):
+                                            dd = f.get('deathDate') or f.get('deathdate') or f.get('death_date')
+                                            if isinstance(dd, str) and dd.strip():
+                                                death_date = dd
+                                                break
+                                except Exception:
+                                    pass
+                            # If has death info, log BEFORE DB write
+                            try:
+                                if isinstance(death_date, str) and death_date.strip():
+                                    try:
+                                        print(f"[DEBUG] DEATH ALERT CID={cid} deathDate={death_date}")
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
                             upsert_srm_check(db_conn, cid, check_date, death_date, funds, resp.status_code)
                             # Determine new pttype values directly from API response with fallbacks to funds[]
                             new_type = ""
@@ -422,9 +457,10 @@ class Patient(QWidget, Patient_ui):
         except Exception:
             self._pending_rows = rows
         self._pending_debug = bool(debug)
+        self._pending_force = bool(force)
 
         self._thread = QThread(self)
-        self._worker = RightsWorker(debug=debug)
+        self._worker = RightsWorker(debug=debug, force=force)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
 
@@ -508,7 +544,11 @@ class Patient(QWidget, Patient_ui):
                             self._show_status('รีเฟรชโทเคนสำเร็จ กำลังตรวจสอบสิทธิต่อใน 5 วินาที...', 7000)
                         except Exception:
                             pass
-                        QTimer.singleShot(5000, lambda: self._start_rights_worker(getattr(self, '_pending_rows', []), debug=getattr(self, '_pending_debug', False)))
+                        QTimer.singleShot(5000, lambda: self._start_rights_worker(
+                            getattr(self, '_pending_rows', []),
+                            debug=getattr(self, '_pending_debug', False),
+                            force=getattr(self, '_pending_force', False)
+                        ))
                 else:
                     try:
                         self._show_status('พยายามรีเฟรชโทเคนแล้ว แต่ยังหมดอายุอยู่ ไม่ทำการลองซ้ำอีกครั้ง', 7000)
@@ -541,14 +581,6 @@ class Patient(QWidget, Patient_ui):
         self._worker.mark_checked.connect(on_mark_checked)
         self._worker.finished_summary.connect(on_finished_summary)
         self._worker.update_rights.connect(on_update_rights)
-        def on_debug_output(cid: str, text: str):
-            try:
-                # Truncate very long outputs for dialog
-                preview = text if len(text) <= 4000 else (text[:4000] + "... [truncated]")
-                QMessageBox.information(self, f"API Response (CID: {cid})", preview)
-            except Exception:
-                pass
-        self._worker.debug_output.connect(on_debug_output)
         def on_need_resume_from(proxy_row: int):
             try:
                 self._resume_from = int(proxy_row)

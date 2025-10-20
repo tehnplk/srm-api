@@ -2,4 +2,4 @@ update person set pttype='89',pttype_begin_date='2025-05-01T14:16:41',pttype_exp
 
 update patient set pttype='89' where cid='1659900724626'
 
-update ovst set pttype='89',pttypeno='N896541363895',hospmain='14972',hospsub='07479' where hn='000007173' and vstdate='2025-10-18'
+update ovst set pttype='89',pttypeno='N896541363895',hospmain='14972',hospsub='07479' where hn='000007173' and vstdate=CURRENT_DATE
