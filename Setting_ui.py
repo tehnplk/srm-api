@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QComboBox,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSettings
 from PyQt6.QtGui import QFont
 
 
@@ -33,13 +33,16 @@ class Setting_ui(object):
 
         # Main layout
         self.main_layout = QVBoxLayout(Setting_ui)
-        self.main_layout.setContentsMargins(20, 20, 20, 20)
-        self.main_layout.setSpacing(18)
+        self.main_layout.setContentsMargins(12, 12, 12, 12)
+        self.main_layout.setSpacing(12)
 
         # Title
         self.title_label = QLabel("การตั้งค่าการเชื่อมต่อฐานข้อมูล MySQL", Setting_ui)
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self.title_label.setFont(QFont("Segoe UI", 13, QFont.Weight.DemiBold))
+        self.title_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.title_label.setContentsMargins(0, 0, 0, 6)
+        self.title_label.setStyleSheet("margin: 0px; padding: 2px 0;")
         self.main_layout.addWidget(self.title_label)
 
         # Group
@@ -104,6 +107,25 @@ class Setting_ui(object):
         apply_input_sizing(self.timeout_spin)
         self.form_layout.addRow(QLabel("Timeout (s):"), self.timeout_spin)
 
+        # Load settings on init
+        try:
+            qset = QSettings("SRM_API", "MySQL_Settings")
+            self.system_combo.setCurrentText(str(qset.value("system", "jhcis")).strip())
+            self.host_edit.setText(str(qset.value("host", "") or ""))
+            try:
+                self.port_spin.setValue(int(qset.value("port", 3306)))
+            except Exception:
+                self.port_spin.setValue(3306)
+            self.database_edit.setText(str(qset.value("database", "") or ""))
+            self.username_edit.setText(str(qset.value("user", "") or ""))
+            self.password_edit.setText(str(qset.value("password", "") or ""))
+            try:
+                self.timeout_spin.setValue(int(qset.value("timeout", 10)))
+            except Exception:
+                self.timeout_spin.setValue(10)
+        except Exception:
+            pass
+
         # Buttons
         self.buttons = QHBoxLayout()
         self.buttons.setSpacing(10)
@@ -116,13 +138,11 @@ class Setting_ui(object):
 
         self.test_button = make_btn("ทดสอบการเชื่อมต่อ")
         self.save_button = make_btn("บันทึก")
-        self.load_button = make_btn("โหลด")
         self.cancel_button = make_btn("ยกเลิก")
 
         self.buttons.addStretch(1)
         self.buttons.addWidget(self.test_button)
         self.buttons.addWidget(self.save_button)
-        self.buttons.addWidget(self.load_button)
         self.buttons.addWidget(self.cancel_button)
         self.buttons.addStretch(1)
 

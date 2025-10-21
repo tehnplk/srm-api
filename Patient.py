@@ -1,7 +1,7 @@
 import sys
 from typing import List, Any
 
-from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QInputDialog, QMenu, QAbstractItemView
+from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QInputDialog, QMenu, QAbstractItemView, QProgressDialog
 from PyQt6.QtCore import QSettings, Qt, QSortFilterProxyModel, QRegularExpression, QObject, pyqtSignal, QThread, QCoreApplication, QTimer
 from PyQt6.QtGui import QGuiApplication
 from datetime import datetime
@@ -77,68 +77,79 @@ class Patient(QWidget, Patient_ui):
     def load_patients(self):
         if not self._ensure_config_complete():
             return
-        import pymysql
+        dlg = QProgressDialog("กำลังโหลดรายชื่อ...", "", 0, 0, self)
+        dlg.setWindowTitle("กำลังโหลด")
+        dlg.setCancelButton(None)
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.show()
+        try:
+            QApplication.processEvents()
+            import pymysql
 
-        cfg = self._get_db_config()
-        conn = pymysql.connect(**cfg)
-        with conn.cursor() as cur:
-            system = str(self.settings.value("system", "jhcis")).strip().lower()
-            if system == "jhcis":
-                # JHCIS: map to expected headers, join ctitle to resolve prename title
-                cur.execute(
-                    """
-                    SELECT 
-                        p.idcard          AS cid,
-                        t.titlename       AS pname,
-                        p.fname           AS fname,
-                        p.lname           AS lname,
-                        p.rightcode       AS pttype,
-                        p.rightno         AS pttype_no
-                    FROM person p
-                    LEFT JOIN ctitle t ON p.prename = t.titlecode
-                    WHERE CHAR_LENGTH(p.idcard) = 13 
-                      AND p.idcard REGEXP '^[0-9]{13}$'
-                      AND (p.dischargedate IS NULL OR p.dischargedate = '0000-00-00')
-                    """
-                )
-            else:
-                # HOSxP default
-                dead_cids = []
-                try:
-                    if _has_hosxp_death_flag(conn):
-                        cur.execute(
-                            """
-                            SELECT cid FROM patient
-                            WHERE death='Y' AND CHAR_LENGTH(cid)=13 AND cid REGEXP '^[0-9]{13}$'
-                            """
-                        )
-                        dead_cids = [str(r[0]) for r in (cur.fetchall() or []) if r and r[0]]
-                except Exception:
-                    dead_cids = []
-
-                if dead_cids:
-                    placeholders = ",".join(["%s"] * len(dead_cids))
-                    sql = (
-                        """
-                        SELECT cid, pname, fname, lname, pttype, pttype_no
-                        FROM patient
-                        WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
-                          AND cid NOT IN (""" + placeholders + ")"
-                    )
-                    cur.execute(sql, dead_cids)
-                else:
+            cfg = self._get_db_config()
+            conn = pymysql.connect(**cfg)
+            with conn.cursor() as cur:
+                system = str(self.settings.value("system", "jhcis")).strip().lower()
+                if system == "jhcis":
                     cur.execute(
                         """
-                        SELECT cid, pname, fname, lname, pttype, pttype_no
-                        FROM patient
-                        WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
+                        SELECT 
+                            p.idcard          AS cid,
+                            t.titlename       AS pname,
+                            p.fname           AS fname,
+                            p.lname           AS lname,
+                            p.rightcode       AS pttype,
+                            p.rightno         AS pttype_no
+                        FROM person p
+                        LEFT JOIN ctitle t ON p.prename = t.titlecode
+                        WHERE CHAR_LENGTH(p.idcard) = 13 
+                          AND p.idcard REGEXP '^[0-9]{13}$'
+                          AND (p.dischargedate IS NULL OR p.dischargedate = '0000-00-00')
                         """
                     )
-            rows = cur.fetchall()
-            headers = [col[0] for col in cur.description]
-        conn.close()
+                else:
+                    dead_cids = []
+                    try:
+                        if _has_hosxp_death_flag(conn):
+                            cur.execute(
+                                """
+                                SELECT cid FROM patient
+                                WHERE death='Y' AND CHAR_LENGTH(cid)=13 AND cid REGEXP '^[0-9]{13}$'
+                                """
+                            )
+                            dead_cids = [str(r[0]) for r in (cur.fetchall() or []) if r and r[0]]
+                    except Exception:
+                        dead_cids = []
 
-        self._populate_table(headers, rows)
+                    if dead_cids:
+                        placeholders = ",".join(["%s"] * len(dead_cids))
+                        sql = (
+                            """
+                            SELECT cid, pname, fname, lname, pttype, pttype_no
+                            FROM patient
+                            WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
+                              AND cid NOT IN (""" + placeholders + ")"
+                        )
+                        cur.execute(sql, dead_cids)
+                    else:
+                        cur.execute(
+                            """
+                            SELECT cid, pname, fname, lname, pttype, pttype_no
+                            FROM patient
+                            WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
+                            """
+                        )
+                rows = cur.fetchall()
+                headers = [col[0] for col in cur.description]
+            conn.close()
+
+            self._populate_table(headers, rows)
+        finally:
+            try:
+                dlg.close()
+            except Exception:
+                pass
 
     def _populate_table(self, headers: List[str], rows: List[tuple]):
         # Prepend a 'check' column

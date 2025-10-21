@@ -23,11 +23,9 @@ class Setting(QWidget, Setting_ui):
         # Wire buttons
         self.test_button.clicked.connect(self.test_connection)
         self.save_button.clicked.connect(self.save_settings)
-        self.load_button.clicked.connect(self.load_settings)
         self.cancel_button.clicked.connect(self.on_cancel)
 
-        # Load on start
-        self.load_settings()
+        # Settings are loaded during UI setup via QSettings
 
     def get_config(self) -> Dict:
         return {
@@ -94,6 +92,8 @@ class Setting(QWidget, Setting_ui):
             self.settings.setValue("system", cfg["system"])
             self.settings.sync()
             QMessageBox.information(self, "บันทึกแล้ว", "บันทึกการตั้งค่าเรียบร้อย")
+            # Close settings form after successful save
+            self.on_cancel()
         except Exception as e:
             QMessageBox.critical(self, "ผิดพลาด", f"บันทึกล้มเหลว: {e}")
 

@@ -47,6 +47,8 @@ class Main(QMainWindow, Main_ui):
                     window.setWindowState(
                         window.windowState() & ~Qt.WindowState.WindowMinimized
                     )
+                    # Maximize existing subwindow inside MDI area
+                    window.showMaximized()
                     self.centralwidget.setActiveSubWindow(window)
                     window.activateWindow()
                     return
@@ -55,19 +57,9 @@ class Main(QMainWindow, Main_ui):
             child = child_class(*args, **kwargs)
             sub_window = self.centralwidget.addSubWindow(child)
             sub_window.setWindowTitle(title)
-            # Desired size
-            w, h = 800, 600
-            sub_window.resize(w, h)
-            # Center within MDI area
-            try:
-                area_size = self.centralwidget.viewport().size()
-            except Exception:
-                area_size = self.centralwidget.size()
-            x = max(0, (area_size.width() - w) // 2)
-            y = max(0, (area_size.height() - h) // 2)
-            sub_window.move(x, y)
             sub_window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-            sub_window.show()
+            # Show new subwindow maximized inside MDI area
+            sub_window.showMaximized()
             
             self.statusbar.showMessage(f"เปิด{title}")
 
