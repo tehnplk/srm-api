@@ -260,8 +260,8 @@ class Patient(QWidget, Patient_ui):
         try:
             new_tok = refresh_token()
             QMessageBox.information(self, 'สำเร็จ', 'รีเฟรชโทเคนเรียบร้อยแล้ว')
-        except Exception:
-            QMessageBox.warning(self, 'ล้มเหลว', 'การขอ token ใหม่เกิดข้อผิดพลาด')
+        except Exception as e:
+            QMessageBox.warning(self, 'ล้มเหลว', f'การขอ token ใหม่เกิดข้อผิดพลาด:\n{e}')
 
     def _start_rights_worker(self, rows: List[tuple], debug: bool = False, force: bool = False):
         import pymysql
@@ -533,9 +533,9 @@ class Patient(QWidget, Patient_ui):
                         # Refresh token now
                         from srm import refresh_token
                         refresh_token()
-                    except Exception:
+                    except Exception as ex:
                         try:
-                            self._show_status('การขอ token ใหม่เกิดข้อผิดพลาด', 7000)
+                            self._show_status(f"การขอ token ใหม่เกิดข้อผิดพลาด: {ex}", 7000)
                         except Exception:
                             pass
                     else:

@@ -215,7 +215,12 @@ def refresh_token():
 
     # Do not write file if error
     if not resp.ok:
-        raise RuntimeError("การขอ token ใหม่เกิดข้อผิดพลาด")
+        try:
+            err_js = resp.json()
+            body_text = json.dumps(err_js, ensure_ascii=False)
+        except Exception:
+            body_text = (resp.text or "").strip()
+        raise RuntimeError(f"การขอ token ใหม่เกิดข้อผิดพลาด (status={resp.status_code}): {body_text[:1000]}")
 
     text = (resp.text or "").strip()
 
@@ -242,7 +247,12 @@ def refresh_token():
 
     if not access_line:
         # No valid access token, do not overwrite file
-        raise RuntimeError("การขอ token ใหม่เกิดข้อผิดพลาด")
+        try:
+            err_js = js  # from above if available
+            body_text = json.dumps(err_js, ensure_ascii=False)
+        except Exception:
+            body_text = (text or "").strip()
+        raise RuntimeError(f"การขอ token ใหม่เกิดข้อผิดพลาด (no access_token in response): {body_text[:1000]}")
 
     # Write back only normalized lines we have
     out_lines = [access_line]
