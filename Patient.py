@@ -47,13 +47,18 @@ class Patient(QWidget, Patient_ui):
             pass
         QTimer.singleShot(0, self._mark_checked_today_in_view)
 
-        # Wire rights check button
-        self.check_rights_button.clicked.connect(self.check_rights)
-        # Wire stop button
+        # Toggle rights check button (single button with two states)
         try:
-            self.stop_rights_button.clicked.connect(self.on_stop_rights)
+            self.stop_rights_button.setVisible(False)
         except Exception:
             pass
+        self._is_checking = False
+        try:
+            self.check_rights_button.setText("✅ ตรวจสอบสิทธิ")
+        except Exception:
+            pass
+        # No icon; emoji is included in the label text
+        self.check_rights_button.clicked.connect(self.on_toggle_check_rights)
 
     def _get_db_config(self):
         return {
@@ -266,6 +271,20 @@ class Patient(QWidget, Patient_ui):
                 if line.startswith('access-token='):
                     return line.split('=', 1)[1]
         raise ValueError('ไม่พบ access-token ในไฟล์ token.txt')
+
+    def _set_checking_state(self, running: bool):
+        self._is_checking = bool(running)
+        try:
+            self.check_rights_button.setText("❌ หยุดตรวจสอบ" if self._is_checking else "✅ ตรวจสอบสิทธิ")
+        except Exception:
+            pass
+        # No icon updates; emoji is included in the label text
+
+    def on_toggle_check_rights(self):
+        if getattr(self, "_is_checking", False):
+            self.on_stop_rights()
+        else:
+            self.check_rights()
 
     def on_refresh_token(self):
         try:
@@ -576,6 +595,11 @@ class Patient(QWidget, Patient_ui):
                     self._show_status('ตรวจสอบสิทธิเสร็จสิ้น', 5000)
                 except Exception:
                     pass
+                # Back to idle state
+                try:
+                    self._set_checking_state(False)
+                except Exception:
+                    pass
             self._thread.quit()
             self._thread.wait()
             # Let Qt delete objects on thread finish; guard double-deletes
@@ -623,6 +647,11 @@ class Patient(QWidget, Patient_ui):
             self._show_status('หยุดการตรวจสอบสิทธิแล้ว', 4000)
         except Exception:
             pass
+        # Update toggle button state
+        try:
+            self._set_checking_state(False)
+        except Exception:
+            pass
 
     def check_rights(self):
         import pymysql
@@ -645,6 +674,16 @@ class Patient(QWidget, Patient_ui):
         if isinstance(start_from, int) and start_from > 0:
             rows = [(pr, cid) for pr, cid in rows if pr >= start_from]
 
+        # Nothing to do
+        if not rows:
+            try:
+                QMessageBox.information(self, 'ไม่มีข้อมูล', 'ไม่มีข้อมูลสำหรับตรวจสอบสิทธิ')
+            except Exception:
+                pass
+            return
+
+        # Switch to running state and start
+        self._set_checking_state(True)
         self._start_rights_worker(rows)
 
     def _on_about_to_quit(self):
