@@ -38,6 +38,16 @@ class Patient(QWidget, Patient_ui):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.on_table_context_menu)
 
+        # Selection highlight color
+        try:
+            self.table.setStyleSheet(
+                "QTableView::item:selected{background:#FFE5B4;color:black;}"
+                "QTableView::item:selected:active{background:#FFE5B4;color:black;}"
+                "QTableView::item:selected:!active{background:#FFE5B4;color:black;}"
+            )
+        except Exception:
+            pass
+
         # Initial load
         self.load_patients()
         # After load, mark rows already checked today
