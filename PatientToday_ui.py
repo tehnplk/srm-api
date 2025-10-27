@@ -1,4 +1,5 @@
 import sys
+import os
 
 from PyQt6.QtWidgets import (
     QVBoxLayout,
@@ -8,8 +9,10 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QDateEdit,
     QApplication,
+    QPushButton,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QIcon
 
 
 class PatientToday_ui(object):
@@ -49,6 +52,13 @@ class PatientToday_ui(object):
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
         self.date_layout.addWidget(self.date_edit)
 
+        # Add check rights button
+        self.check_rights_button = QPushButton("ตรวจสอบสิทธิ", PatientToday_ui)
+        icon_path = os.path.join(os.path.dirname(__file__), "check.png")
+        self.check_rights_button.setIcon(QIcon(icon_path))
+        self.check_rights_button.setIconSize(QSize(20, 20))
+        self.date_layout.addWidget(self.check_rights_button)
+
         # Push contents to the left
         self.date_layout.addStretch()
 
@@ -63,6 +73,7 @@ class PatientToday_ui(object):
         PatientToday_ui.setWindowTitle("ผู้รับบริการวันนี้")
         self.title_label.setText("ผู้รับบริการวันนี้")
         self.date_label.setText("วันที่:")
+        self.check_rights_button.setText("ตรวจสอบสิทธิ")
 
 
 if __name__ == "__main__":
