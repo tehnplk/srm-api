@@ -1,7 +1,6 @@
 import sys
 import os
 import json
-import shutil
 import tempfile
 import zipfile
 import requests
@@ -13,7 +12,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtCore import QUrl, QObject, pyqtSignal, QThread
-from Version import CODE as CUR_CODE, NAME as CUR_NAME, RELEASE as CUR_RELEASE
 
 from Update_ui import Update_ui
 
@@ -25,8 +23,8 @@ class Update(QDialog, Update_ui):
         self.remote_download_url = ""
         self._thread: QThread | None = None
         self._worker: QObject | None = None
-        # Initialize UI values from Version.py (no try/except; show errors in console if any)
-        self.lbl_cur.setText(f"เวอร์ชัน: {CUR_NAME}  |  โค้ด: {CUR_CODE}  |  เผยแพร่: {CUR_RELEASE}")
+        # Initialize UI values (updater no longer depends on Version.py)
+        self.lbl_cur.setText("-")
         self.lbl_new.setText("ยังไม่ได้ตรวจสอบอัปเดต")
         self.lbl_notes.setText("")
         # This updater is download-only: disable/hide the check button
@@ -43,26 +41,7 @@ class Update(QDialog, Update_ui):
 
     
 
-    def _parse_semver(self, v: str):
-        try:
-            parts = [int(p) for p in str(v or "").split('.')]
-            return tuple(parts + [0] * (3 - len(parts)))[:3]
-        except Exception:
-            return (0, 0, 0)
-
-    def _is_newer(self, remote_code: str | int | None, remote_name: str | None) -> bool:
-        # Only consider numeric codes. If new code cannot be obtained, no update.
-        try:
-            rc = int(str(remote_code)) if remote_code is not None and str(remote_code).strip() != '' else None
-        except Exception:
-            rc = None
-        try:
-            lc = int(str(CUR_CODE)) if str(CUR_CODE).strip() != '' else None
-        except Exception:
-            lc = None
-        if rc is None or lc is None:
-            return False
-        return rc > lc
+    
 
     def _load_new_file(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -78,6 +57,9 @@ class Update(QDialog, Update_ui):
             self.lbl_status.setText(f"อ่าน new.txt ไม่ได้: {e}")
             return
         # Map keys from file (written by Main)
+        c_name = str(data.get('current_name') or '')
+        c_code = data.get('current_code')
+        c_release = str(data.get('current_release') or '')
         r_name = str(data.get('new_version_name') or data.get('name') or '')
         r_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
         r_release_raw = str(data.get('release') or '')
@@ -91,6 +73,15 @@ class Update(QDialog, Update_ui):
         r_notes = str(data.get('notes') or data.get('changelog') or '')
 
         # Populate UI
+        cur_info = []
+        if c_name:
+            cur_info.append(f"เวอร์ชัน: {c_name}")
+        if c_code is not None and str(c_code) != '':
+            cur_info.append(f"โค้ด: {c_code}")
+        if c_release:
+            cur_info.append(f"เผยแพร่: {c_release}")
+        self.lbl_cur.setText("  |  ".join(cur_info) if cur_info else "-")
+
         new_info = []
         if r_name:
             new_info.append(f"เวอร์ชัน: {r_name}")
@@ -226,19 +217,6 @@ class _DownloadWorker(QObject):
         super().__init__()
         self.url = url
 
-    def _copy_tree(self, src: str, dst: str):
-        for root, dirs, files in os.walk(src):
-            rel = os.path.relpath(root, src)
-            target_dir = os.path.join(dst, rel) if rel != '.' else dst
-            os.makedirs(target_dir, exist_ok=True)
-            for f in files:
-                # Avoid overwriting the running updater itself
-                if f.lower().startswith('update'):
-                    continue
-                src_file = os.path.join(root, f)
-                dst_file = os.path.join(target_dir, f)
-                shutil.copy2(src_file, dst_file)
-
     def run(self):
         try:
             self.status.emit("กำลังเชื่อมต่อเซิร์ฟเวอร์...")
@@ -267,25 +245,27 @@ class _DownloadWorker(QObject):
                         self.progress.emit(pct)
             self.status.emit("ดาวน์โหลดเสร็จ กำลังแตกไฟล์...")
 
-            extract_dir = tempfile.mkdtemp(prefix='hishelp_update_')
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            extract_dir = os.path.join(app_dir, 'update_package')
+            # recreate target folder
+            if os.path.exists(extract_dir):
+                try:
+                    import shutil
+                    shutil.rmtree(extract_dir, ignore_errors=True)
+                except Exception:
+                    pass
+            os.makedirs(extract_dir, exist_ok=True)
             with zipfile.ZipFile(tmp_path, 'r') as zf:
                 zf.extractall(extract_dir)
 
-            self.status.emit("กำลังติดตั้ง (แทนที่ไฟล์เก่า)...")
-            app_dir = os.path.dirname(os.path.abspath(__file__))
-            self._copy_tree(extract_dir, app_dir)
-
+            # cleanup temp zip
             try:
                 os.remove(tmp_path)
             except Exception:
                 pass
-            try:
-                shutil.rmtree(extract_dir, ignore_errors=True)
-            except Exception:
-                pass
 
             self.progress.emit(100)
-            self.finished.emit("ติดตั้งเสร็จแล้ว กรุณาเปิดโปรแกรมใหม่")
+            self.finished.emit(f"ดาวน์โหลดและแตกไฟล์เสร็จแล้ว: {extract_dir}")
         except Exception as e:
             import traceback
             traceback.print_exc()

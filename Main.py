@@ -131,8 +131,19 @@ class Main(QMainWindow, Main_ui):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         new_path = os.path.join(script_dir, 'new.txt')
         try:
+            # augment payload with current version info
+            data_out = dict(data)
+            data_out['current_code'] = cur_code
+            try:
+                data_out['current_name'] = str(APP_VERSION_NAME)
+            except Exception:
+                pass
+            try:
+                data_out['current_release'] = str(APP_VERSION_RELEASE)
+            except Exception:
+                pass
             with open(new_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False)
+                json.dump(data_out, f, ensure_ascii=False)
         except Exception as e:
             QMessageBox.warning(self, "อัปเดต", f"ไม่สามารถเขียนไฟล์ new.txt: {e}")
             return
