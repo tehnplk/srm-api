@@ -4,6 +4,7 @@ import json
 import tempfile
 import zipfile
 import requests
+import gdown
 from PyQt6.QtWidgets import (
     QWidget,
     QDialog,
@@ -21,6 +22,7 @@ class Update(QDialog, Update_ui):
         super().__init__(parent)
         self.setupUi(self)
         self.remote_download_url = ""
+        self.remote_file_id = ""
         self._thread: QThread | None = None
         self._worker: QObject | None = None
         # Initialize UI values (updater no longer depends on Version.py)
@@ -70,6 +72,7 @@ class Update(QDialog, Update_ui):
             or data.get('url')
             or ''
         )
+        r_file_id = str(data.get('file_id') or '')
         r_notes = str(data.get('notes') or data.get('changelog') or '')
 
         # Populate UI
@@ -92,11 +95,13 @@ class Update(QDialog, Update_ui):
         self.lbl_new.setText("  |  ".join(new_info) if new_info else "ไม่พบข้อมูลเวอร์ชันใหม่")
         self.lbl_notes.setText(r_notes)
         self.remote_download_url = r_url
-        self.btn_open.setEnabled(bool(r_url))
-        if r_url:
+        self.remote_file_id = r_file_id
+        can_download = bool(r_url) or bool(r_file_id)
+        self.btn_open.setEnabled(can_download)
+        if can_download:
             self.lbl_status.setText("พร้อมดาวน์โหลดและติดตั้ง")
         else:
-            self.lbl_status.setText("ไม่พบลิงก์ดาวน์โหลดใน new.txt")
+            self.lbl_status.setText("ไม่พบลิงก์ดาวน์โหลดหรือ file_id ใน new.txt")
 
     def _cleanup_thread(self):
         self.btn_check.setEnabled(True)
@@ -155,7 +160,7 @@ class Update(QDialog, Update_ui):
             QMessageBox.information(self, "อัปเดต", "ขณะนี้เป็นเวอร์ชันล่าสุดแล้ว")
 
     def start_download_and_install(self):
-        if not self.remote_download_url:
+        if not (self.remote_download_url or self.remote_file_id):
             QMessageBox.information(self, "อัปเดต", "ไม่พบลิงก์ดาวน์โหลด")
             return
         # Disable buttons during download
@@ -165,7 +170,7 @@ class Update(QDialog, Update_ui):
         self.lbl_status.setText("กำลังดาวน์โหลด...")
 
         self._thread = QThread(self)
-        self._worker = _DownloadWorker(self.remote_download_url)
+        self._worker = _DownloadWorker(self.remote_download_url, self.remote_file_id)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.progress.connect(self._on_download_progress)
@@ -213,41 +218,48 @@ class _DownloadWorker(QObject):
     finished = pyqtSignal(str)
     failed = pyqtSignal(str)
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, file_id: str):
         super().__init__()
         self.url = url
+        self.file_id = file_id
 
     def run(self):
         try:
             self.status.emit("กำลังเชื่อมต่อเซิร์ฟเวอร์...")
-            resp = requests.get(self.url, stream=True, timeout=30)
-            if resp.status_code != 200:
-                self.failed.emit(f"HTTP {resp.status_code}")
-                return
-            total = resp.headers.get('Content-Length') or resp.headers.get('content-length')
-            total = int(total) if total is not None else None
-            if total is None:
-                self.progress.emit(-1)  # indeterminate
-            else:
-                self.progress.emit(0)
-
             fd, tmp_path = tempfile.mkstemp(suffix='.zip')
             os.close(fd)
-            downloaded = 0
-            with open(tmp_path, 'wb') as f:
-                for chunk in resp.iter_content(chunk_size=1024 * 64):
-                    if not chunk:
-                        continue
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total:
-                        pct = int(downloaded * 100 / total)
-                        self.progress.emit(pct)
+            if self.file_id:
+                self.progress.emit(-1)
+                ok = gdown.download(id=self.file_id, output=tmp_path, quiet=False)
+                if not ok:
+                    self.failed.emit("ดาวน์โหลดล้มเหลวจาก Google Drive")
+                    return
+            else:
+                resp = requests.get(self.url, stream=True, timeout=30)
+                if resp.status_code != 200:
+                    self.failed.emit(f"HTTP {resp.status_code}")
+                    return
+                total = resp.headers.get('Content-Length') or resp.headers.get('content-length')
+                total = int(total) if total is not None else None
+                if total is None:
+                    self.progress.emit(-1)
+                else:
+                    self.progress.emit(0)
+                downloaded = 0
+                with open(tmp_path, 'wb') as f:
+                    for chunk in resp.iter_content(chunk_size=1024 * 64):
+                        if not chunk:
+                            continue
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total:
+                            pct = int(downloaded * 100 / total)
+                            self.progress.emit(pct)
+
             self.status.emit("ดาวน์โหลดเสร็จ กำลังแตกไฟล์...")
 
             app_dir = os.path.dirname(os.path.abspath(__file__))
             extract_dir = os.path.join(app_dir, 'update_package')
-            # recreate target folder
             if os.path.exists(extract_dir):
                 try:
                     import shutil
@@ -258,7 +270,6 @@ class _DownloadWorker(QObject):
             with zipfile.ZipFile(tmp_path, 'r') as zf:
                 zf.extractall(extract_dir)
 
-            # cleanup temp zip
             try:
                 os.remove(tmp_path)
             except Exception:

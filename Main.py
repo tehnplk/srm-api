@@ -112,7 +112,19 @@ class Main(QMainWindow, Main_ui):
 
         # Normalize payload: if API returns a list, use the LAST element
         if isinstance(payload, list):
-            data = payload[-1] if payload else {}
+            if not payload:
+                data = {}
+            else:
+                try:
+                    data = max(
+                        payload,
+                        key=lambda x: int(str((x or {}).get('new_version_code') or (x or {}).get('code') or -1))
+                    )
+                except Exception:
+                    try:
+                        data = max(payload, key=lambda x: str((x or {}).get('release') or ''))
+                    except Exception:
+                        data = payload[-1]
         else:
             data = payload if isinstance(payload, dict) else {}
         # Read new code and compare only numeric codes
@@ -136,6 +148,14 @@ class Main(QMainWindow, Main_ui):
         try:
             # augment payload with current version info
             data_out = dict(data)
+            # ensure download_url is present if file_id is available
+            try:
+                if not str(data_out.get('download_url') or '').strip():
+                    fid = str(data_out.get('file_id') or '').strip()
+                    if fid:
+                        data_out['download_url'] = f"https://drive.google.com/uc?id={fid}&export=download"
+            except Exception:
+                pass
             data_out['current_code'] = cur_code
             try:
                 data_out['current_name'] = str(APP_VERSION_NAME)
