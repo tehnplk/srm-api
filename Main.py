@@ -110,8 +110,11 @@ class Main(QMainWindow, Main_ui):
             QMessageBox.warning(self, "อัปเดต", f"ตรวจสอบอัปเดตล้มเหลว: {e}")
             return
 
-        # Normalize payload
-        data = payload[0] if isinstance(payload, list) and payload else (payload if isinstance(payload, dict) else {})
+        # Normalize payload: if API returns a list, use the LAST element
+        if isinstance(payload, list):
+            data = payload[-1] if payload else {}
+        else:
+            data = payload if isinstance(payload, dict) else {}
         # Read new code and compare only numeric codes
         new_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
         try:
@@ -148,16 +151,34 @@ class Main(QMainWindow, Main_ui):
             QMessageBox.warning(self, "อัปเดต", f"ไม่สามารถเขียนไฟล์ new.txt: {e}")
             return
 
-        # Offer to start Update.exe to download and install
+        # Offer to start Update.exe to download and install (show new version details, exclude URL)
         updater_path = os.path.join(script_dir, "Update.exe")
         if not os.path.exists(updater_path):
             QMessageBox.information(self, "อัปเดต", "ไม่พบไฟล์ Update.exe ในโฟลเดอร์โปรแกรม กรุณาตรวจสอบตัวอัปเดต")
             return
 
+        # Build detail message
+        new_name = str(data.get('new_version_name') or data.get('name') or '')
+        new_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
+        rel_raw = str(data.get('release') or '')
+        rel_fmt = rel_raw[:10] if 'T' in rel_raw and len(rel_raw) >= 10 else rel_raw
+        notes = str(data.get('notes') or data.get('changelog') or '')
+        details = []
+        if new_name:
+            details.append(f"เวอร์ชัน: {new_name}")
+        if new_code is not None and str(new_code) != '':
+            details.append(f"โค้ด: {new_code}")
+        if rel_fmt:
+            details.append(f"เผยแพร่: {rel_fmt}")
+        if notes:
+            details.append("")
+            details.append(notes)
+        body = "\n".join(details)
+
         ret = QMessageBox.question(
             self,
             "พบอัปเดต",
-            "พบเวอร์ชันใหม่ ต้องการดาวน์โหลดและติดตั้งเดี๋ยวนี้หรือไม่?",
+            (body + ("\n\n" if body else "")) + "ต้องการดาวน์โหลดและติดตั้งเดี๋ยวนี้หรือไม่?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if ret == QMessageBox.StandardButton.Yes:
