@@ -142,20 +142,11 @@ class Main(QMainWindow, Main_ui):
             QMessageBox.information(self, "อัปเดต", "เป็นเวอร์ชันล่าสุดแล้ว")
             return
 
-        # If newer, write new.txt (JSON) to app folder
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        new_path = os.path.join(script_dir, 'new.txt')
+        # If newer, write new.txt (JSON) using a simple relative path
+        new_path = 'new.txt'
         try:
             # augment payload with current version info
             data_out = dict(data)
-            # ensure download_url is present if file_id is available
-            try:
-                if not str(data_out.get('download_url') or '').strip():
-                    fid = str(data_out.get('file_id') or '').strip()
-                    if fid:
-                        data_out['download_url'] = f"https://drive.google.com/uc?id={fid}&export=download"
-            except Exception:
-                pass
             data_out['current_code'] = cur_code
             try:
                 data_out['current_name'] = str(APP_VERSION_NAME)
@@ -172,7 +163,7 @@ class Main(QMainWindow, Main_ui):
             return
 
         # Offer to start Update.exe to download and install (show new version details, exclude URL)
-        updater_path = os.path.join(script_dir, "Update.exe")
+        updater_path = "Update.exe"
         if not os.path.exists(updater_path):
             QMessageBox.information(self, "อัปเดต", "ไม่พบไฟล์ Update.exe ในโฟลเดอร์โปรแกรม กรุณาตรวจสอบตัวอัปเดต")
             return

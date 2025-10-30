@@ -46,8 +46,7 @@ class Update(QDialog, Update_ui):
     
 
     def _load_new_file(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        new_path = os.path.join(script_dir, 'new.txt')
+        new_path = 'new.txt'
         if not os.path.exists(new_path):
             self.lbl_status.setText("ไม่พบไฟล์ new.txt กรุณาตรวจสอบจากโปรแกรมหลัก")
             return
