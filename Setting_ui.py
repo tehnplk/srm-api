@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QComboBox,
 )
-from PyQt6.QtCore import Qt, QSettings
+from PyQt6.QtCore import Qt, QSettings, QSize
 from PyQt6.QtGui import QFont
 
 
@@ -132,13 +132,43 @@ class Setting_ui(object):
 
         def make_btn(text: str) -> QPushButton:
             btn = QPushButton(text, Setting_ui)
-            btn.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
-            btn.setMinimumWidth(140)
+            btn.setFont(QFont("Segoe UI", 13, QFont.Weight.DemiBold))
+            btn.setMinimumWidth(160)
+            btn.setMinimumHeight(48)
             return btn
+
+        def style_btn(btn: QPushButton, color: str, hover: str | None = None, pressed: str | None = None):
+            h = hover or color
+            p = pressed or color
+            btn.setStyleSheet(
+                f"""
+                QPushButton {{
+                    background-color: {color};
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 10px 16px;
+                }}
+                QPushButton:hover {{
+                    background-color: {h};
+                }}
+                QPushButton:pressed {{
+                    background-color: {p};
+                }}
+                QPushButton:disabled {{
+                    background-color: #cccccc;
+                    color: #666666;
+                }}
+                """
+            )
 
         self.test_button = make_btn("ทดสอบการเชื่อมต่อ")
         self.save_button = make_btn("บันทึก")
         self.cancel_button = make_btn("ยกเลิก")
+
+        style_btn(self.test_button, "#2563eb", "#1d4ed8", "#1e40af")
+        style_btn(self.save_button, "#16a34a", "#15803d", "#166534")
+        style_btn(self.cancel_button, "#dc2626", "#b91c1c", "#991b1b")
 
         self.buttons.addStretch(1)
         self.buttons.addWidget(self.test_button)

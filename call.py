@@ -3,8 +3,8 @@ import json
 import os
 
 pid = "3650100813118"
-#pid = "3650100810887"
-#pid = "1101401192332"
+pid = "3650101207220"
+pid = "3660700517161"
 url = f"https://srm.nhso.go.th/api/ucws/v1/right-search?pid={pid}"
 
 # อ่าน token จากไฟล์

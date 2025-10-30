@@ -83,6 +83,8 @@ class Patient(QWidget, Patient_ui):
 
     def _ensure_config_complete(self) -> bool:
         cfg = self._get_db_config()
+        system = str(self.settings.value("system", "jhcis")).strip().lower()
+        system = str(self.settings.value("system", "jhcis")).strip().lower()
         missing = [k for k in ("host", "user", "database") if not str(cfg.get(k, "")).strip()]
         if missing:
             QMessageBox.warning(self, "การตั้งค่าไม่ครบ", f"โปรดตั้งค่า: {', '.join(missing)} ในเมนู ตั้งค่า")
@@ -324,6 +326,7 @@ class Patient(QWidget, Patient_ui):
                 pass
             return
         cfg = self._get_db_config()
+        system = str(self.settings.value("system", "jhcis")).strip().lower()
 
         class RightsWorker(QObject):
             progress_row = pyqtSignal(int)
@@ -331,12 +334,13 @@ class Patient(QWidget, Patient_ui):
             finished_summary = pyqtSignal(int, int, int, int, bool)  # skipped_today, skipped_dead, succeeded, failed, token_expired
             need_resume_from = pyqtSignal(int)  # row index to resume from when token expired
             update_rights = pyqtSignal(int, str, str, str)  # proxy_row, cid, pttype_new, pttype_no_new
-            def __init__(self, debug: bool = False, force: bool = False):
+            def __init__(self, system: str, debug: bool = False, force: bool = False):
                 super().__init__()
                 self._stop = False
                 self._debug = bool(debug)
                 self._force_recheck = bool(force)
                 self._alerted_once = False
+                self._system = (system or "").lower()
             def request_stop(self):
                 self._stop = True
 
@@ -442,6 +446,12 @@ class Patient(QWidget, Patient_ui):
                             # Determine new pttype values directly from API response with fallbacks to funds[]
                             new_type = ""
                             new_no = ""
+                            hospmain_hcode = None
+                            hospsub_hcode = None
+                            begin_date = None
+                            expire_date = None
+                            main_inscl_name = None
+                            sub_inscl_name = None
                             try:
                                 # Prefer top-level fields if available
                                 subinscl_top = data.get('subinscl') or data.get('subInscl')
@@ -449,23 +459,182 @@ class Patient(QWidget, Patient_ui):
                                 if subinscl_top:
                                     if isinstance(subinscl_top, dict):
                                         new_type = str(subinscl_top.get('id') or subinscl_top.get('name') or "")
+                                        try:
+                                            sub_inscl_name = sub_inscl_name or str(subinscl_top.get('name') or "")
+                                        except Exception:
+                                            pass
                                     else:
                                         new_type = str(subinscl_top)
                                 if cardid_top:
                                     new_no = str(cardid_top)
+                                try:
+                                    maininscl_top = data.get('mainInscl') or data.get('maininscl')
+                                    if isinstance(maininscl_top, dict):
+                                        main_inscl_name = main_inscl_name or str(maininscl_top.get('name') or "")
+                                except Exception:
+                                    pass
+                                # Optional top-level hosp codes and dates
+                                try:
+                                    hm_top = data.get('hospMain') or {}
+                                    if isinstance(hm_top, dict):
+                                        hospmain_hcode = hospmain_hcode or hm_top.get('hcode')
+                                    hs_top = data.get('hospSub') or {}
+                                    if isinstance(hs_top, dict):
+                                        hospsub_hcode = hospsub_hcode or hs_top.get('hcode')
+                                    begin_date = begin_date or data.get('startDateTime')
+                                    expire_date = expire_date or data.get('expireDateTime')
+                                except Exception:
+                                    pass
 
                                 # Fallback to first fund entry when top-level missing
-                                if (not new_type or not new_no) and isinstance(funds, list) and funds:
+                                if ((not new_type) or (not new_no) or (not main_inscl_name) or (not sub_inscl_name)) and isinstance(funds, list) and funds:
                                     f0 = funds[0] if isinstance(funds[0], dict) else {}
                                     if not new_type:
                                         sub = f0.get('subInscl') if isinstance(f0.get('subInscl'), dict) else None
                                         if sub:
                                             new_type = str(sub.get('id') or sub.get('name') or "")
+                                            try:
+                                                sub_inscl_name = sub_inscl_name or str(sub.get('name') or "")
+                                            except Exception:
+                                                pass
                                     if not new_no:
                                         new_no = str(f0.get('cardId') or f0.get('cardID') or "")
+                                    # Extract hosp codes and dates from funds[0]
+                                    try:
+                                        main0 = f0.get('mainInscl') if isinstance(f0.get('mainInscl'), dict) else None
+                                        if main0 and not main_inscl_name:
+                                            main_inscl_name = str(main0.get('name') or "")
+                                        hm = f0.get('hospMain') if isinstance(f0.get('hospMain'), dict) else None
+                                        if hm and not hospmain_hcode:
+                                            hospmain_hcode = hm.get('hcode')
+                                        hs = f0.get('hospSub') if isinstance(f0.get('hospSub'), dict) else None
+                                        if hs and not hospsub_hcode:
+                                            hospsub_hcode = hs.get('hcode')
+                                        if not begin_date:
+                                            begin_date = f0.get('startDateTime')
+                                        if not expire_date:
+                                            expire_date = f0.get('expireDateTime')
+                                    except Exception:
+                                        pass
                             except Exception:
                                 new_type = ""
                                 new_no = ""
+                            # Persist rights back to DB depending on system
+                            try:
+                                if (new_type or new_no):
+                                    with db_conn.cursor() as c_upd:
+                                        if self._system == 'hosxp':
+                                            # 1) Update person with full fields and DATE() casts for date-only columns
+                                            sql_person = (
+                                                "UPDATE person SET "
+                                                "pttype=%s, "
+                                                "pttype_begin_date=DATE(%s), "
+                                                "pttype_expire_date=DATE(%s), "
+                                                "pttype_hospmain=%s, "
+                                                "pttype_hospsub=%s, "
+                                                "pttype_no=%s, "
+                                                "last_update_pttype=NOW() "
+                                                "WHERE cid=%s"
+                                            )
+                                            params_person = [
+                                                new_type or None,
+                                                begin_date or None,
+                                                expire_date or None,
+                                                (hospmain_hcode or None),
+                                                (hospsub_hcode or None),
+                                                new_no or None,
+                                                cid,
+                                            ]
+                                            c_upd.execute(sql_person, params_person)
+                                            db_conn.commit()
+
+                                            # 2) Update patient (only existing columns) and bump last_update
+                                            sql_patient = (
+                                                "UPDATE patient SET "
+                                                "pttype=%s, pttype_no=%s, "
+                                                "pttype_hospmain=%s, pttype_hospsub=%s, "
+                                                "last_update=NOW() "
+                                                "WHERE cid=%s"
+                                            )
+                                            params_patient = [
+                                                new_type or None,
+                                                new_no or None,
+                                                (hospmain_hcode or None),
+                                                (hospsub_hcode or None),
+                                                cid,
+                                            ]
+                                            c_upd.execute(sql_patient, params_patient)
+                                            db_conn.commit()
+
+                                            # 3) Update today's ovst joined by patient.cid
+                                            sql_ovst = (
+                                                "UPDATE ovst o "
+                                                "JOIN patient p ON p.hn = o.hn "
+                                                "SET o.pttype=%s, o.pttypeno=%s, o.hospmain=%s, o.hospsub=%s "
+                                                "WHERE DATE(o.vstdate)=CURDATE() AND p.cid=%s"
+                                            )
+                                            params_ovst = [
+                                                new_type or None,
+                                                new_no or None,
+                                                (hospmain_hcode or None),
+                                                (hospsub_hcode or None),
+                                                cid,
+                                            ]
+                                            c_upd.execute(sql_ovst, params_ovst)
+                                            db_conn.commit()
+                                        elif self._system == 'jhcis':
+                                            # Update person rights (JHCIS)
+                                            sets = []
+                                            params = []
+                                            if new_type:
+                                                sets.append("rightcode=%s"); params.append(new_type)
+                                            if new_no:
+                                                sets.append("rightno=%s"); params.append(new_no)
+                                            if hospmain_hcode is not None:
+                                                sets.append("hosmain=%s"); params.append(hospmain_hcode)
+                                            if hospsub_hcode is not None:
+                                                sets.append("hossub=%s"); params.append(hospsub_hcode)
+                                            if begin_date:
+                                                sets.append("datestart=DATE(%s)"); params.append(begin_date)
+                                            if expire_date:
+                                                sets.append("dateexpire=DATE(%s)"); params.append(expire_date)
+                                            if sets:
+                                                sets.append("dateupdate=NOW()")
+                                                params.append(cid)
+                                                sql = "UPDATE person SET " + ", ".join(sets) + " WHERE idcard=%s"
+                                                c_upd.execute(sql, params)
+                                                db_conn.commit()
+
+                                            # Update today's visit by pid (JHCIS)
+                                            try:
+                                                pid_val = None
+                                                c_upd.execute("SELECT pid FROM person WHERE idcard=%s LIMIT 1", (cid,))
+                                                rpid = c_upd.fetchone()
+                                                if rpid and len(rpid) > 0:
+                                                    pid_val = rpid[0]
+                                                if pid_val is not None:
+                                                    sql_visit = (
+                                                        "UPDATE visit SET "
+                                                        "rightcode=%s, rightno=%s, hosmain=%s, hossub=%s, "
+                                                        "main_inscl=%s, sub_inscl=%s, dateupdate=NOW() "
+                                                        "WHERE pid=%s AND visitdate=CURDATE()"
+                                                    )
+                                                    params_visit = [
+                                                        (new_type or None),
+                                                        (new_no or None),
+                                                        (hospmain_hcode or None),
+                                                        (hospsub_hcode or None),
+                                                        (main_inscl_name or None),
+                                                        (sub_inscl_name or None),
+                                                        pid_val,
+                                                    ]
+                                                    c_upd.execute(sql_visit, params_visit)
+                                                    db_conn.commit()
+                                            except Exception:
+                                                pass
+                            except Exception:
+                                # fail-soft; continue processing other rows
+                                pass
                             try:
                                 self.update_rights.emit(proxy_row, cid, new_type, new_no)
                             except RuntimeError:
@@ -500,7 +669,7 @@ class Patient(QWidget, Patient_ui):
         self._pending_force = bool(force)
 
         self._thread = QThread(self)
-        self._worker = RightsWorker(debug=debug, force=force)
+        self._worker = RightsWorker(system=system, debug=debug, force=force)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
 

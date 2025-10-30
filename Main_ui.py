@@ -95,6 +95,13 @@ class Main_ui(object):
         self.menuHelp.setTitle("Help")
         MainWindow.menuBar().addAction(self.menuHelp.menuAction())
 
+        # ตรวจสอบเวอร์ชัน action
+        self.actionCheckUpdate = QAction(MainWindow)
+        self.actionCheckUpdate.setObjectName("actionCheckUpdate")
+        self.actionCheckUpdate.setText("🔄 ตรวจสอบเวอร์ชัน")
+        self.actionCheckUpdate.setStatusTip("ตรวจสอบอัปเดตเวอร์ชันใหม่")
+        self.menuHelp.addAction(self.actionCheckUpdate)
+
         # เกี่ยวกับ action
         self.actionAbout = QAction(MainWindow)
         self.actionAbout.setObjectName("actionAbout")

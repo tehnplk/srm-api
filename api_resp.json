@@ -1,0 +1,52 @@
+{
+  "checkDate": "2025-10-30T09:47:26",
+  "pid": "3650100810895",
+  "tname": "นาย",
+  "fname": "สุทัศน์",
+  "lname": "จาดยางโทน",
+  "nation": {
+    "id": "099",
+    "name": "ไทย"
+  },
+  "birthDate": "กันยายน 2524",
+  "sex": {
+    "id": "1",
+    "name": "ชาย"
+  },
+  "funds": [
+    {
+      "transDate": "2023-10-01T18:00:00",
+      "fundType": "Y",
+      "mainInscl": {
+        "id": "UCS",
+        "name": "สิทธิหลักประกันสุขภาพแห่งชาติ"
+      },
+      "subInscl": {
+        "id": "89",
+        "name": "ช่วงอายุ 12-59 ปี"
+      },
+      "paidModel": "1",
+      "hospMainOp": {
+        "hcode": "11005",
+        "hname": "รพ.แวงใหญ่"
+      },
+      "hospSub": {
+        "hcode": "11005",
+        "hname": "รพ.แวงใหญ่"
+      },
+      "hospMain": {
+        "hcode": "11005",
+        "hname": "รพ.แวงใหญ่"
+      },
+      "purchaseProvince": {
+      "purchaseProvince": {
+        "id": "4000",
+        "name": "ขอนแก่น"
+      },
+      "expireDateTime": "2041-09-01T23:59:59",
+      "startDateTime": "2023-05-01T09:02:22",
+      "relation": "สิทธิตนเอง",
+      "cardId": "N894028513437"
+    }
+  ]
+}

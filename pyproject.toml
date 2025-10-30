@@ -8,4 +8,5 @@ dependencies = [
     "requests>=2.31.0",
     "PyQt6>=6.5.0",
     "PyMySQL>=1.1.0",
+    "pyinstaller>=6.16.0",
 ]

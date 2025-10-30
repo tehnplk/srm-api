@@ -1,7 +1,9 @@
 import sys
 import os
+import json
+from Version import NAME as APP_VERSION_NAME, RELEASE as APP_VERSION_RELEASE, CODE as APP_VERSION_CODE
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMdiSubWindow, QMessageBox
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QProcess
 from PyQt6.QtGui import QIcon
 
 # Import local modules
@@ -20,10 +22,21 @@ class Main(QMainWindow, Main_ui):
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
+        try:
+            v_name = str(APP_VERSION_NAME or "").strip()
+            v_rel = str(APP_VERSION_RELEASE or "").strip()
+            title_extra = f" v{v_name}" if v_name else ""
+            if v_rel:
+                title_extra += f" ({v_rel})"
+            self.setWindowTitle(f"HisHelp{title_extra}")
+        except Exception:
+            pass
+
         # Connect actions
         self.actionPatient.triggered.connect(self.show_patient)
         self.actionPatientToday.triggered.connect(self.show_patient_today)
         self.actionSetting.triggered.connect(self.show_setting)
+        self.actionCheckUpdate.triggered.connect(self.show_check_update)
         self.actionAbout.triggered.connect(self.show_about)
         
         # Connect View menu actions
@@ -81,19 +94,50 @@ class Main(QMainWindow, Main_ui):
         from Setting import Setting
         self.show_mdi_child(Setting, "⚙️ ตั้งค่า", parent=self)
 
+    def show_check_update(self):
+        # Try to run external updater and exit
+        try:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            updater_path = os.path.join(script_dir, "Update.exe")
+            if os.path.exists(updater_path):
+                try:
+                    QProcess.startDetached(updater_path, [])
+                    app = QApplication.instance()
+                    if app is not None:
+                        app.quit()
+                    return
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # If no external updater, inform user
+        QMessageBox.information(
+            self,
+            "อัปเดต",
+            "ไม่พบไฟล์ Update.exe ในโฟลเดอร์โปรแกรม กรุณาตรวจสอบตัวอัปเดต",
+        )
+
     def show_about(self):
         """Show about dialog"""
+        v_name = str(APP_VERSION_NAME or "").strip()
+        v_rel = str(APP_VERSION_RELEASE or "").strip()
+        v_code = str(APP_VERSION_CODE or "").strip()
+        ver_line = f"<p><b>เวอร์ชัน:</b> {v_name}</p>" if v_name else ""
+        rel_line = f"<p><b>วันที่เผยแพร่:</b> {v_rel}</p>" if v_rel else ""
+        code_line = f"<p><b>โค้ดเวอร์ชัน:</b> {v_code}</p>" if v_code else ""
         QMessageBox.about(
             self,
             "เกี่ยวกับ HisHelp",
-            """
+            f"""
             <h3>HisHelp - ระบบช่วยตรวจสอบสิทธิ</h3>
-            <p><b>เวอร์ชัน:</b> 1.0.0</p>
-            <p><b>พัฒนาโดย:</b> SRM Team</p>
+            {ver_line}
+            {code_line}
+            {rel_line}
+            <p><b>พัฒนาโดย:</b> PLK Digital Health</p>
             <p><b>คำอธิบาย:</b> เครื่องมือช่วยตรวจสอบสิทธิ์และผู้รับบริการ</p>
-            <p><b>เทคโนโลยี:</b> Python 3.12 + PyQt6</p>
+            <p><b>เทคโนโลยี:</b> SRM API</p>
             <hr>
-            <p><i>© 2024 HisHelp. All rights reserved.</i></p>
+            <p><i>© 2024 PLK Digital Health. All rights reserved.</i></p>
             """
         )
         self.statusbar.showMessage("แสดงข้อมูลเกี่ยวกับโปรแกรม")
@@ -125,7 +169,11 @@ class Main(QMainWindow, Main_ui):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("HisHelp")
-    app.setApplicationVersion("1.0.0")
+    try:
+        if APP_VERSION_NAME:
+            app.setApplicationVersion(str(APP_VERSION_NAME))
+    except Exception:
+        pass
     app.setOrganizationName("SRM Team")
     # Set application icon
     script_dir = os.path.dirname(os.path.abspath(__file__))

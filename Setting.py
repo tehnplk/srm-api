@@ -24,6 +24,10 @@ class Setting(QWidget, Setting_ui):
         self.test_button.clicked.connect(self.test_connection)
         self.save_button.clicked.connect(self.save_settings)
         self.cancel_button.clicked.connect(self.on_cancel)
+        try:
+            self.system_combo.currentTextChanged.connect(self.on_system_changed)
+        except Exception:
+            pass
 
         # Settings are loaded during UI setup via QSettings
 
@@ -106,7 +110,15 @@ class Setting(QWidget, Setting_ui):
             password = self.settings.value("password", "")
             timeout = int(self.settings.value("timeout", 10))
             system = self.settings.value("system", "jhcis")
-
+            try:
+                if not str(database or "").strip():
+                    sys_l = str(system or "").strip().lower()
+                    if sys_l == "hosxp":
+                        database = "hosxp_pcu"
+                    elif sys_l == "jhcis":
+                        database = "jhcisdb"
+            except Exception:
+                pass
             self.host_edit.setText(host)
             self.port_spin.setValue(port)
             self.database_edit.setText(database)
@@ -121,6 +133,26 @@ class Setting(QWidget, Setting_ui):
                 self.system_combo.setCurrentIndex(0)
         except Exception as e:
             QMessageBox.critical(self, "ผิดพลาด", f"โหลดการตั้งค่าล้มเหลว: {e}")
+
+    def on_system_changed(self, text: str):
+        try:
+            sys_l = str(text or "").strip().lower()
+            if sys_l == "hosxp":
+                # Always overwrite to default when switching to HOSxP
+                self.database_edit.setText("hosxp_pcu")
+                try:
+                    self.port_spin.setValue(3306)
+                except Exception:
+                    pass
+            elif sys_l == "jhcis":
+                # Always overwrite to default when switching to JHCIS
+                self.database_edit.setText("jhcisdb")
+                try:
+                    self.port_spin.setValue(3333)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def on_cancel(self):
         """Close the Settings window, ensuring MDI subwindow wrapper is closed."""
