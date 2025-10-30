@@ -84,29 +84,51 @@ class PatientToday(QWidget, PatientToday_ui):
             raise ValueError("โปรดตั้งค่าการเชื่อมต่อฐานข้อมูลให้ครบถ้วนในเมนู ตั้งค่า")
 
         date_str = qdate.toString("yyyy-MM-dd")
+        system = self._get_system()
 
-        sql = (
-            """
-            SELECT 
-                o.vn,
-                p.cid,
-                CONCAT_WS(' ', p.pname, p.fname, p.lname) AS fullname,
-                o.pttype,
-                sc.subinscl_name
-            FROM ovst o
-            JOIN patient p ON p.hn = o.hn
-            LEFT JOIN srm_check sc ON sc.cid = p.cid AND DATE(sc.check_date) = %s
-            WHERE DATE(o.vstdate) = %s
-            ORDER BY o.vn
-            """
-        )
+        if system == 'hosxp':
+            sql = (
+                """
+                SELECT 
+                    o.vn,
+                    p.cid,
+                    CONCAT_WS(' ', p.pname, p.fname, p.lname) AS fullname,
+                    o.pttype,
+                    sc.subinscl_name
+                FROM ovst o
+                JOIN patient p ON p.hn = o.hn
+                LEFT JOIN srm_check sc ON sc.cid = p.cid AND DATE(sc.check_date) = %s
+                WHERE DATE(o.vstdate) = %s
+                ORDER BY o.vn
+                """
+            )
+            params = (date_str, date_str)
+        else:
+            # JHCIS: list by visit table
+            sql = (
+                """
+                SELECT 
+                    v.visit_no AS vn,
+                    p.idcard AS cid,
+                    CONCAT_WS(' ', t.titlename, p.fname, p.lname) AS fullname,
+                    COALESCE(v.rightcode, p.rightcode) AS pttype,
+                    sc.subinscl_name
+                FROM visit v
+                JOIN person p ON p.pid = v.pid
+                LEFT JOIN ctitle t ON p.prename = t.titlecode
+                LEFT JOIN srm_check sc ON sc.cid = p.idcard AND DATE(sc.check_date) = %s
+                WHERE v.visitdate = %s
+                ORDER BY p.idcard
+                """
+            )
+            params = (date_str, date_str)
 
         rows = []
         headers = ["vn", "cid", "fullname", "pttype", "subinscl_name"]
         conn = pymysql.connect(**cfg)
         try:
             with conn.cursor() as cur:
-                cur.execute(sql, (date_str, date_str))
+                cur.execute(sql, params)
                 rows = cur.fetchall() or []
         finally:
             try:
