@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import requests
 from Version import NAME as APP_VERSION_NAME, RELEASE as APP_VERSION_RELEASE, CODE as APP_VERSION_CODE
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMdiSubWindow, QMessageBox
 from PyQt6.QtCore import Qt, QProcess
@@ -95,27 +96,67 @@ class Main(QMainWindow, Main_ui):
         self.show_mdi_child(Setting, "⚙️ ตั้งค่า", parent=self)
 
     def show_check_update(self):
-        # Try to run external updater and exit
-        try:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            updater_path = os.path.join(script_dir, "Update.exe")
-            if os.path.exists(updater_path):
-                try:
-                    QProcess.startDetached(updater_path, [])
-                    app = QApplication.instance()
-                    if app is not None:
-                        app.quit()
-                    return
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        # If no external updater, inform user
-        QMessageBox.information(
-            self,
-            "อัปเดต",
-            "ไม่พบไฟล์ Update.exe ในโฟลเดอร์โปรแกรม กรุณาตรวจสอบตัวอัปเดต",
+        """Check update from API, write new.txt if newer, and offer to download via Update.exe."""
+        api_url = (
+            "https://script.google.com/macros/s/AKfycbxD9CI91jGbL-MWHvBDvCqgh8s9DaTEZ38ItvX7yX37w65mQzWC_DQ5SzlrViEooh9wtg/exec"
         )
+        try:
+            resp = requests.get(api_url, timeout=10)
+            if resp.status_code != 200:
+                QMessageBox.warning(self, "อัปเดต", f"ตรวจสอบอัปเดตล้มเหลว: HTTP {resp.status_code}")
+                return
+            payload = resp.json()
+        except Exception as e:
+            QMessageBox.warning(self, "อัปเดต", f"ตรวจสอบอัปเดตล้มเหลว: {e}")
+            return
+
+        # Normalize payload
+        data = payload[0] if isinstance(payload, list) and payload else (payload if isinstance(payload, dict) else {})
+        # Read new code and compare only numeric codes
+        new_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
+        try:
+            new_code = int(str(new_code)) if new_code is not None and str(new_code).strip() != '' else None
+        except Exception:
+            new_code = None
+        try:
+            cur_code = int(str(APP_VERSION_CODE)) if str(APP_VERSION_CODE).strip() != '' else None
+        except Exception:
+            cur_code = None
+
+        if new_code is None or cur_code is None or not (new_code > cur_code):
+            QMessageBox.information(self, "อัปเดต", "เป็นเวอร์ชันล่าสุดแล้ว")
+            return
+
+        # If newer, write new.txt (JSON) to app folder
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        new_path = os.path.join(script_dir, 'new.txt')
+        try:
+            with open(new_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False)
+        except Exception as e:
+            QMessageBox.warning(self, "อัปเดต", f"ไม่สามารถเขียนไฟล์ new.txt: {e}")
+            return
+
+        # Offer to start Update.exe to download and install
+        updater_path = os.path.join(script_dir, "Update.exe")
+        if not os.path.exists(updater_path):
+            QMessageBox.information(self, "อัปเดต", "ไม่พบไฟล์ Update.exe ในโฟลเดอร์โปรแกรม กรุณาตรวจสอบตัวอัปเดต")
+            return
+
+        ret = QMessageBox.question(
+            self,
+            "พบอัปเดต",
+            "พบเวอร์ชันใหม่ ต้องการดาวน์โหลดและติดตั้งเดี๋ยวนี้หรือไม่?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ret == QMessageBox.StandardButton.Yes:
+            try:
+                QProcess.startDetached(updater_path, [])
+                app = QApplication.instance()
+                if app is not None:
+                    app.quit()
+            except Exception as e:
+                QMessageBox.warning(self, "อัปเดต", f"ไม่สามารถเริ่ม Update.exe: {e}")
 
     def show_about(self):
         """Show about dialog"""

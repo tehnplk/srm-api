@@ -4,13 +4,15 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QLabel,
-    QTableView,
     QHBoxLayout,
     QPushButton,
     QApplication,
+    QSpacerItem,
+    QSizePolicy,
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QProgressBar
 
 
 class Update_ui(object):
@@ -19,166 +21,91 @@ class Update_ui(object):
     """
 
     def setupUi(self, Update_ui):
-        """
-        Set up the user interface following the scaffold style.
-        """
-        # Set window properties
-        Update_ui.setWindowTitle("Update Management")
-        Update_ui.resize(1000, 700)
+        """Set up UI for the Update dialog (modern style)."""
+        Update_ui.setWindowTitle("ตรวจสอบอัปเดต HisHelp")
+        Update_ui.resize(640, 380)
 
-        # Create main layout
+        # Root layout on the provided widget/dialog
         self.main_layout = QVBoxLayout(Update_ui)
         self.main_layout.setContentsMargins(20, 20, 20, 20)
-        self.main_layout.setSpacing(15)
+        self.main_layout.setSpacing(12)
 
-        # Create title label
-        self.title_label = QLabel("Update Management System", Update_ui)
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setStyleSheet(
-            "font-size: 20px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;"
-        )
+        # Title
+        self.title_label = QLabel("อัปเดตโปรแกรม HisHelp", Update_ui)
+        title_font = QFont()
+        title_font.setPointSize(18)
+        title_font.setBold(True)
+        self.title_label.setFont(title_font)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.main_layout.addWidget(self.title_label)
 
-        # Create button layout
-        self.button_layout = QHBoxLayout()
+        # Current version block
+        cur_title = QLabel("เวอร์ชันปัจจุบัน", Update_ui)
+        cur_font = QFont()
+        cur_font.setPointSize(12)
+        cur_font.setBold(True)
+        cur_title.setFont(cur_font)
+        self.main_layout.addWidget(cur_title)
 
-        # Create action buttons
-        self.add_button = QPushButton("Add", Update_ui)
-        self.add_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #27ae60;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #219a52;
-            }
-            QPushButton:pressed {
-                background-color: #1e8449;
-            }
-        """
+        self.lbl_cur = QLabel("-", Update_ui)
+        self.lbl_cur.setWordWrap(True)
+        self.main_layout.addWidget(self.lbl_cur)
+
+        # Spacer
+        self.main_layout.addSpacing(6)
+
+        # New version block
+        new_title = QLabel("เวอร์ชันใหม่", Update_ui)
+        new_title.setFont(cur_font)
+        self.main_layout.addWidget(new_title)
+
+        self.lbl_new = QLabel("ยังไม่ได้ตรวจสอบอัปเดต", Update_ui)
+        self.lbl_new.setWordWrap(True)
+        self.main_layout.addWidget(self.lbl_new)
+
+        self.lbl_notes = QLabel("", Update_ui)
+        self.lbl_notes.setWordWrap(True)
+        self.lbl_notes.setStyleSheet("color:#555; font-size: 12px;")
+        self.main_layout.addWidget(self.lbl_notes)
+
+        # Status and progress
+        self.lbl_status = QLabel("พร้อมตรวจสอบอัปเดต", Update_ui)
+        self.lbl_status.setStyleSheet("color:#2c3e50; font-weight: bold;")
+        self.main_layout.addWidget(self.lbl_status)
+
+        self.progress = QProgressBar(Update_ui)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(0)
+        self.progress.setTextVisible(True)
+        self.progress.setStyleSheet(
+            "QProgressBar {height: 18px; border: 1px solid #bdc3c7; border-radius: 6px; background: #ecf0f1;}"
+            "QProgressBar::chunk {background-color: #27ae60; border-radius: 6px;}"
         )
-        self.button_layout.addWidget(self.add_button)
+        self.main_layout.addWidget(self.progress)
 
-        self.edit_button = QPushButton("Edit", Update_ui)
-        self.edit_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #2980b9;
-            }
-            QPushButton:pressed {
-                background-color: #21618c;
-            }
-        """
+        # Buttons row
+        btn_row = QHBoxLayout()
+        btn_row.addItem(QSpacerItem(20, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        self.btn_check = QPushButton("🔄 ตรวจสอบอัปเดต", Update_ui)
+        self.btn_open = QPushButton("⬇️ ดาวน์โหลดและติดตั้ง", Update_ui)
+        # Button styles
+        btn_style = (
+            "QPushButton { background-color: #3498db; color: white; border: none; padding: 10px 18px;"
+            " border-radius: 6px; font-weight: 600; font-size: 14px; }"
+            "QPushButton:hover { background-color: #2980b9; }"
+            "QPushButton:disabled { background-color: #95a5a6; }"
         )
-        self.button_layout.addWidget(self.edit_button)
-
-        self.delete_button = QPushButton("Delete", Update_ui)
-        self.delete_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #e74c3c;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #c0392b;
-            }
-            QPushButton:pressed {
-                background-color: #a93226;
-            }
-        """
-        )
-        self.button_layout.addWidget(self.delete_button)
-
-        self.refresh_button = QPushButton("Refresh", Update_ui)
-        self.refresh_button.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #95a5a6;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #7f8c8d;
-            }
-            QPushButton:pressed {
-                background-color: #6c7b7d;
-            }
-        """
-        )
-        self.button_layout.addWidget(self.refresh_button)
-
-        # Add stretch to push buttons to the left
-        self.button_layout.addStretch()
-
-        # Add button layout to main layout
-        self.main_layout.addLayout(self.button_layout)
-
-        # Create table view
-        self.visit_table = QTableView(Update_ui)
-        self.visit_table.setStyleSheet(
-            """
-            QTableView {
-                gridline-color: #bdc3c7;
-                background-color: white;
-                alternate-background-color: #f8f9fa;
-                selection-background-color: #3498db;
-                border: 1px solid #bdc3c7;
-                border-radius: 4px;
-            }
-            QTableView::item {
-                padding: 8px;
-                border-bottom: 1px solid #ecf0f1;
-            }
-            QTableView::item:selected {
-                background-color: #3498db;
-                color: white;
-            }
-            QHeaderView::section {
-                background-color: #34495e;
-                color: white;
-                padding: 10px;
-                border: none;
-                font-weight: bold;
-            }
-        """
-        )
-        self.visit_table.setAlternatingRowColors(True)
-        self.visit_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.visit_table.setSortingEnabled(True)
-
-        # Add table to layout
-        self.main_layout.addWidget(self.visit_table)
+        self.btn_check.setStyleSheet(btn_style)
+        self.btn_open.setStyleSheet(btn_style.replace('#3498db', '#2ecc71').replace('#2980b9', '#27ae60'))
+        btn_row.addWidget(self.btn_check)
+        btn_row.addWidget(self.btn_open)
+        self.main_layout.addLayout(btn_row)
 
     def retranslateUi(self, Update_ui):
         """
         Retranslate the user interface.
         """
-        Update_ui.setWindowTitle("Update Management")
-        self.title_label.setText("Update Management System")
-        self.add_button.setText("Add")
-        self.edit_button.setText("Edit")
-        self.delete_button.setText("Delete")
-        self.refresh_button.setText("Refresh")
+        Update_ui.setWindowTitle("ตรวจสอบอัปเดต HisHelp")
 
 
 if __name__ == "__main__":
