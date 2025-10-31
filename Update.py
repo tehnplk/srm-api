@@ -1,4 +1,5 @@
 import sys
+import traceback
 import os
 import json
 import tempfile
@@ -33,8 +34,8 @@ class Update(QDialog, Update_ui):
         try:
             self.btn_check.setEnabled(False)
             self.btn_check.setVisible(False)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         # Wire download button
         self.btn_open.clicked.connect(self.start_download_and_install)
         self.btn_open.setEnabled(False)
@@ -263,16 +264,16 @@ class _DownloadWorker(QObject):
                 try:
                     import shutil
                     shutil.rmtree(extract_dir, ignore_errors=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    traceback.print_exc()
             os.makedirs(extract_dir, exist_ok=True)
             with zipfile.ZipFile(tmp_path, 'r') as zf:
                 zf.extractall(extract_dir)
 
             try:
                 os.remove(tmp_path)
-            except Exception:
-                pass
+            except Exception as e:
+                traceback.print_exc()
 
             self.progress.emit(100)
             self.finished.emit(f"ดาวน์โหลดและแตกไฟล์เสร็จแล้ว: {extract_dir}")

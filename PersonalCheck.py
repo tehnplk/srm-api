@@ -1,4 +1,5 @@
 import sys
+import traceback
 from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox
 from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QIntValidator, QGuiApplication, QKeySequence
@@ -18,21 +19,21 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
     def on_check(self):
         try:
             QMessageBox.information(self, "ตรวจสอบสิทธิ", "ฟังก์ชันตรวจสอบสิทธิจะถูกพัฒนาในขั้นถัดไป")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
     def on_clear(self):
         try:
             # Clear table model
             self.result_table.setModel(None)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
     def on_refresh(self):
         try:
             QMessageBox.information(self, "รีเฟรช", "ทำการรีเฟรชข้อมูลแล้ว")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
     # ===== Logic for 13-digit CID inputs =====
     def _init_cid_inputs(self):
@@ -42,8 +43,8 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             for idx, edit in enumerate(self.cid_edits):
                 try:
                     edit.setValidator(validator)
-                except Exception:
-                    pass
+                except Exception as e:
+                    traceback.print_exc()
                 # Connect auto-advance when one digit entered
                 edit.textChanged.connect(lambda _t, i=idx: self._on_digit_changed(i))
                 # Install event filter for backspace behavior
@@ -55,10 +56,10 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             if self._cid_count:
                 try:
                     self.cid_edits[-1].returnPressed.connect(self._on_submit_cid)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    traceback.print_exc()
+        except Exception as e:
+            traceback.print_exc()
 
     def _on_digit_changed(self, idx: int):
         try:
@@ -70,12 +71,12 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                 nxt.setFocus()
                 try:
                     nxt.selectAll()
-                except Exception:
-                    pass
+                except Exception as e:
+                    traceback.print_exc()
             # Update live preview
             self._update_pid_preview()
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
     def eventFilter(self, obj, event):
         try:
@@ -99,14 +100,14 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                                     self.cid_edits[next_pos].setFocus()
                                     try:
                                         self.cid_edits[next_pos].selectAll()
-                                    except Exception:
-                                        pass
+                                    except Exception as e:
+                                        traceback.print_exc()
                                 else:
                                     self.cid_edits[-1].setFocus()
                                 self._update_pid_preview()
                                 return True
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        traceback.print_exc()
                     if event.key() == Qt.Key.Key_Backspace and obj.text() == "":
                         idx = self.cid_edits.index(obj)
                         if idx > 0:
@@ -115,43 +116,16 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                             prev.clear()
                             try:
                                 prev.selectAll()
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                traceback.print_exc()
                             return True
                         else:
                             # Update preview even when deleting within a field
                             self._update_pid_preview()
-            elif event.type() == QEvent.Type.Paste:
-                # Handle paste from clipboard: fill digits across fields
-                if hasattr(self, 'cid_edits') and obj in self.cid_edits:
-                    try:
-                        text = QGuiApplication.clipboard().text() or ""
-                        digits = ''.join(ch for ch in text if ch.isdigit())
-                        if not digits:
-                            return False
-                        start = self.cid_edits.index(obj)
-                        # Fill sequentially
-                        for i, ch in enumerate(digits):
-                            pos = start + i
-                            if pos >= len(self.cid_edits):
-                                break
-                            self.cid_edits[pos].setText(ch)
-                        # Move focus to next empty or last field
-                        next_pos = start + len(digits)
-                        if next_pos < len(self.cid_edits):
-                            self.cid_edits[next_pos].setFocus()
-                            try:
-                                self.cid_edits[next_pos].selectAll()
-                            except Exception:
-                                pass
-                        else:
-                            self.cid_edits[-1].setFocus()
-                        self._update_pid_preview()
-                        return True
-                    except Exception:
-                        return False
-        except Exception:
-            pass
+            # Note: explicit QEvent.Type.Paste branch is omitted for PyQt6 compatibility.
+            # Paste is handled in the KeyPress branch via event.matches(QKeySequence.Paste).
+        except Exception as e:
+            traceback.print_exc()
         return super().eventFilter(obj, event)
 
     # Helpers
@@ -160,8 +134,8 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             w = getattr(self, attr, None)
             if w is not None:
                 w.setText(text)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
     def _dash(self, value) -> str:
         try:
@@ -176,7 +150,7 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                 self.log_text.append(message)
             else:
                 print(message)
-        except Exception:
+        except Exception as e:
             print(message)
 
     def _fmt_code_name(self, obj: dict | None) -> str:
@@ -188,7 +162,8 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             if code and name:
                 return f"({code}) {name}"
             return name or code
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             return ""
 
     def _fmt_pid(self, pid: str) -> str:
@@ -197,7 +172,8 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             if len(digits) != 13:
                 return pid
             return f"{digits[0]}-{digits[1:5]}-{digits[5:10]}-{digits[10:12]}-{digits[12]}"
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             return str(pid)
 
     def _on_submit_cid(self):
@@ -219,17 +195,6 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             # If unauthorized, try refresh token once
             if resp.status_code == 401:
                 try:
-                    self._log("[TOKEN] 401 Unauthorized -> refreshing token...")
-                    token = refresh_token()
-                    resp = call_right_search(token, cid)
-                    self._log(f"[API] RETRY right-search status={resp.status_code} {getattr(resp, 'reason', '')}")
-                except Exception as e:
-                    self._log(f"[TOKEN] Refresh failed: {e}")
-            if not resp.ok:
-                # Populate Response tab with whatever body we have
-                status_line = f"HTTP {resp.status_code} {getattr(resp, 'reason', '')}".strip()
-                api_msg = None
-                try:
                     js = resp.json()
                     self._log(f"[API] Error body: {js}")
                     import json as _json
@@ -244,7 +209,8 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                         or (js.get('error_description') if isinstance(js, dict) else None)
                         or (js.get('error') if isinstance(js, dict) else None)
                     )
-                except Exception:
+                except Exception as e:
+                    traceback.print_exc()
                     self._log(f"[API] Error text: {resp.text}")
                     if hasattr(self, 'raw_text') and self.raw_text is not None:
                         self.raw_text.setPlainText(status_line + "\n\n" + (resp.text or ''))
@@ -264,7 +230,8 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                     status_line = f"HTTP {resp.status_code} {getattr(resp, 'reason', '')}".strip()
                     try:
                         body = _json.dumps(data, ensure_ascii=False, indent=2)
-                    except Exception:
+                    except Exception as e:
+                        traceback.print_exc()
                         body = str(data)
                     self.raw_text.setPlainText(status_line + "\n\n" + body)
             except Exception as e:
@@ -296,6 +263,7 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
 
             self._log("[OK] อัปเดตผลการตรวจสอบสิทธิเรียบร้อย")
         except Exception as e:
+            traceback.print_exc()
             print(f"Error collecting CID: {e}")
 
     def _update_pid_preview(self):
@@ -303,8 +271,8 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             digits = ''.join(e.text().strip() for e in getattr(self, 'cid_edits', []))
             if hasattr(self, 'cid_preview') and self.cid_preview is not None:
                 self.cid_preview.setText(self._fmt_pid(digits))
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
 
 if __name__ == "__main__":

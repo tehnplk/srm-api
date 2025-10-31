@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
 )
-from PyQt6.QtGui import QAction, QIcon, QFont
+from PyQt6.QtGui import QAction, QIcon, QFont, QPainter, QPixmap, QColor, QBrush, QPalette
 from PyQt6.QtCore import Qt, QSize
 
 
@@ -75,7 +75,6 @@ class Main_ui(object):
                 }
                 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
                     border: 1px solid #86b7fe;
-                    box-shadow: 0 0 0 3px rgba(13,110,253,.25);
                 }
 
                 /* Group boxes */
@@ -115,6 +114,27 @@ class Main_ui(object):
         self.centralwidget.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.centralwidget.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         MainWindow.setCentralWidget(self.centralwidget)
+        # Add watermark background: "HisHelp" on the MDI area
+        try:
+            pix = QPixmap(420, 220)
+            pix.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pix)
+            f = QFont("Segoe UI", 52, QFont.Weight.Bold)
+            p.setFont(f)
+            c = QColor(13, 110, 253)
+            c.setAlpha(40 * 255 // 100)  # ~40% opacity
+            p.setPen(c)
+            rect = pix.rect()
+            p.drawText(rect, Qt.AlignmentFlag.AlignCenter, "HisHelp")
+            p.end()
+
+            brush = QBrush(pix)
+            pal = self.centralwidget.palette()
+            pal.setBrush(QPalette.ColorRole.Window, brush)
+            self.centralwidget.setAutoFillBackground(True)
+            self.centralwidget.setPalette(pal)
+        except Exception:
+            pass
 
         # Create menu bar
         self.menubar = QMenuBar(MainWindow)

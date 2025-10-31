@@ -55,6 +55,14 @@ class Patient_ui(object):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setSortingEnabled(True)
         self.table.setAlternatingRowColors(True)
+        try:
+            self.table.setStyleSheet(
+                "QTableView::item:selected{background:#FFE5B4;color:black;}"
+                "QTableView::item:selected:active{background:#FFE5B4;color:black;}"
+                "QTableView::item:selected:!active{background:#FFE5B4;color:black;}"
+            )
+        except Exception:
+            pass
         self.main_layout.addWidget(self.table)
 
 

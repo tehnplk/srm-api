@@ -50,6 +50,25 @@ class PatientToday_ui(object):
         self.date_edit = QDateEdit(PatientToday_ui)
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
+        try:
+            self.date_edit.setFixedHeight(44)
+            self.date_edit.setMinimumWidth(180)
+            self.date_edit.setStyleSheet("font-size: 18px; padding: 6px 12px;")
+        except Exception:
+            pass
+        # Style calendar popup: make month/year selectors black
+        try:
+            cal = self.date_edit.calendarWidget()
+            if cal is not None:
+                cal.setStyleSheet(
+                    """
+                    QCalendarWidget QToolButton { color: #000000; }
+                    QCalendarWidget QSpinBox { color: #000000; }
+                    QCalendarWidget QComboBox { color: #000000; }
+                    """
+                )
+        except Exception:
+            pass
         self.date_layout.addWidget(self.date_edit)
 
         # Add check rights button

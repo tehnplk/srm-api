@@ -1,5 +1,6 @@
 import sys
 from typing import List, Any
+import traceback
 
 from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QInputDialog, QMenu, QAbstractItemView, QProgressDialog
 from PyQt6.QtCore import QSettings, Qt, QSortFilterProxyModel, QRegularExpression, QObject, pyqtSignal, QThread, QCoreApplication, QTimer
@@ -45,28 +46,28 @@ class Patient(QWidget, Patient_ui):
                 "QTableView::item:selected:active{background:#FFE5B4;color:black;}"
                 "QTableView::item:selected:!active{background:#FFE5B4;color:black;}"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
         # Initial load
         self.load_patients()
         # After load, mark rows already checked today
         try:
             self.proxy.modelReset.connect(self._mark_checked_today_in_view)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         QTimer.singleShot(0, self._mark_checked_today_in_view)
 
         # Toggle rights check button (single button with two states)
         try:
             self.stop_rights_button.setVisible(False)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         self._is_checking = False
         try:
             self.check_rights_button.setText("✅ ตรวจสอบสิทธิ")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         # No icon; emoji is included in the label text
         self.check_rights_button.clicked.connect(self.on_toggle_check_rights)
 
@@ -165,8 +166,8 @@ class Patient(QWidget, Patient_ui):
         finally:
             try:
                 dlg.close()
-            except Exception:
-                pass
+            except Exception as e:
+                traceback.print_exc()
 
     def _populate_table(self, headers: List[str], rows: List[tuple]):
         # Prepend a 'check' column
@@ -203,7 +204,8 @@ class Patient(QWidget, Patient_ui):
                 else:
                     try:
                         text = str(val)
-                    except Exception:
+                    except Exception as e:
+                        traceback.print_exc()
                         text = repr(val)
                 it = QStandardItem(text)
                 items.append(it)
@@ -268,8 +270,8 @@ class Patient(QWidget, Patient_ui):
                     proxy_row = index.row()
                     try:
                         print(f"[CLICK] Context-menu check requested for CID={value} at proxy_row={proxy_row}")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        traceback.print_exc()
                     self._start_rights_worker([(proxy_row, str(value))], debug=True, force=True)
                 except Exception:
                     pass
@@ -288,8 +290,8 @@ class Patient(QWidget, Patient_ui):
         self._is_checking = bool(running)
         try:
             self.check_rights_button.setText("❌ หยุดตรวจสอบ" if self._is_checking else "✅ ตรวจสอบสิทธิ")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         # No icon updates; emoji is included in the label text
 
     def on_toggle_check_rights(self):
@@ -319,11 +321,12 @@ class Patient(QWidget, Patient_ui):
         # Prepare worker thread
         try:
             token = read_token()
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             try:
                 self._show_status('การขอ token ใหม่เกิดข้อผิดพลาด', 7000)
-            except Exception:
-                pass
+            except Exception as e2:
+                traceback.print_exc()
             return
         cfg = self._get_db_config()
         system = str(self.settings.value("system", "jhcis")).strip().lower()
