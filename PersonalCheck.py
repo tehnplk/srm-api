@@ -15,7 +15,7 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
 
         # Initialize CID inputs behavior
         self._init_cid_inputs()
-        self.smc = SmartCardObserver(read_photo=True)
+        self.smc = SmartCardObserver(read_photo=False)
         self.smc.signal_data.connect(self.smc_data)
         self.smc.signal_photo.connect(self.smc_photo)
         self.smc.signal_state.connect(self.smc_state)
@@ -343,13 +343,13 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                     edit.setText(ch)
                 except Exception:
                     traceback.print_exc()
-            # focus last filled
+            # focus last filled (do not select all; put caret at end)
             try:
                 last_i = min(len(digits), len(edits)) - 1
                 if last_i >= 0:
                     edits[last_i].setFocus()
                     try:
-                        edits[last_i].selectAll()
+                        edits[last_i].setCursorPosition(len(edits[last_i].text()))
                     except Exception:
                         pass
             except Exception:
