@@ -1,7 +1,8 @@
 import sys
+import traceback
 from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QMenu
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QGuiApplication
-from PyQt6.QtCore import QDate, QLocale, Qt
+from PyQt6.QtCore import QDate, QLocale, Qt, QObject, QThread, pyqtSignal
 from srm import (
     read_token,
     ensure_srm_check_table,
@@ -20,8 +21,8 @@ class PatientToday(QWidget, PatientToday_ui):
         # Initialize date picker to today and wire change handler
         try:
             self.date_edit.setDate(QDate.currentDate())
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         # Force Gregorian year and Western digits (avoid Thai/Buddhist year and numerals)
         try:
             en_us = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
@@ -29,18 +30,18 @@ class PatientToday(QWidget, PatientToday_ui):
             cw = self.date_edit.calendarWidget()
             if cw is not None:
                 cw.setLocale(en_us)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         try:
             self.date_edit.dateChanged.connect(self.on_date_changed)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
         # Initial load
         try:
             self._load_for_date(self.date_edit.date())
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
         # Setup context menu for copying vn/cid (set up once)
         try:
@@ -48,8 +49,10 @@ class PatientToday(QWidget, PatientToday_ui):
             self.cid_col = 1
             self.visit_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             self.visit_table.customContextMenuRequested.connect(self.on_table_context_menu)
-        except Exception:
-            pass
+            # Wire button to check selected row's CID
+            self.check_rights_button.clicked.connect(self.on_check_clicked)
+        except Exception as e:
+            traceback.print_exc()
 
     def on_date_changed(self, qdate: QDate):
         # Placeholder: handle date change (e.g., reload table data for selected date)
@@ -108,7 +111,7 @@ class PatientToday(QWidget, PatientToday_ui):
             sql = (
                 """
                 SELECT 
-                    v.visit_no AS vn,
+                    v.visitno AS vn,
                     p.idcard AS cid,
                     CONCAT_WS(' ', t.titlename, p.fname, p.lname) AS fullname,
                     COALESCE(v.rightcode, p.rightcode) AS pttype,
@@ -133,8 +136,80 @@ class PatientToday(QWidget, PatientToday_ui):
         finally:
             try:
                 conn.close()
+            except Exception as e:
+                traceback.print_exc()
+
+    # ==== Batch processing (all rows) ====
+    def _run_all_checks(self, cids: list[str]):
+        class Worker(QObject):
+            finished = pyqtSignal()
+            error = pyqtSignal(str)
+            progress = pyqtSignal(int, int)  # done, total
+            def __init__(self, outer, cids):
+                super().__init__()
+                self.outer = outer
+                self.cids = cids
+            def run(self):
+                import pymysql
+                try:
+                    token = read_token()
+                except Exception as e:
+                    self.error.emit(str(e))
+                    return
+                cfg = self.outer._get_db_config()
+                done = 0
+                try:
+                    conn = pymysql.connect(**cfg)
+                except Exception as e:
+                    self.error.emit(str(e))
+                    return
+                try:
+                    ensure_srm_check_table(conn)
+                    for cid in self.cids:
+                        try:
+                            resp = call_right_search(token, cid)
+                            try:
+                                data = resp.json()
+                            except Exception:
+                                data = {}
+                            check_date = data.get('checkDate')
+                            funds = data.get('funds', [])
+                            # Only upsert srm_check; UI reads subinscl_name from this table
+                            upsert_srm_check(conn, cid, check_date, None, funds, resp.status_code)
+                        except Exception:
+                            traceback.print_exc()
+                        done += 1
+                        self.progress.emit(done, len(self.cids))
+                finally:
+                    try:
+                        conn.close()
+                    except Exception:
+                        traceback.print_exc()
+                self.finished.emit()
+
+        try:
+            self.check_rights_button.setEnabled(False)
+        except Exception:
+            pass
+        self._thread = QThread(self)
+        self._worker = Worker(self, cids)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._thread.deleteLater)
+        def _on_done():
+            try:
+                self._load_for_date(self.date_edit.date())
+            except Exception:
+                traceback.print_exc()
+            try:
+                self.check_rights_button.setEnabled(True)
             except Exception:
                 pass
+            QMessageBox.information(self, "เสร็จสิ้น", "ตรวจสอบสิทธิสำหรับผู้รับบริการทั้งหมดแล้ว")
+        self._worker.finished.connect(_on_done)
+        self._thread.start()
 
         model = QStandardItemModel()
         model.setColumnCount(len(headers))
@@ -174,12 +249,49 @@ class PatientToday(QWidget, PatientToday_ui):
                 try:
                     cid_idx = self.visit_table.model().index(index.row(), self.cid_col)
                     cid_val = cid_idx.data()
-                except Exception:
+                except Exception as e:
+                    traceback.print_exc()
                     cid_val = None
                 if cid_val:
                     self._check_and_update_rights(str(cid_val))
         except Exception:
             pass
+
+    def on_check_clicked(self):
+        try:
+            sel = self.visit_table.selectionModel()
+            model = self.visit_table.model()
+            if model is None:
+                QMessageBox.warning(self, "ไม่พบตาราง", "ตารางข้อมูลยังไม่พร้อม")
+                return
+            # If a row is selected, run single check
+            if sel is not None and sel.hasSelection():
+                row = sel.selectedRows()[0].row()
+                cid_idx = model.index(row, self.cid_col)
+                cid_val = cid_idx.data() if cid_idx.isValid() else None
+                if not cid_val:
+                    QMessageBox.warning(self, "ไม่พบ CID", "ไม่พบค่า CID ในแถวที่เลือก")
+                    return
+                self._check_and_update_rights(str(cid_val))
+                return
+            # Otherwise, run for all rows in background
+            cids = []
+            try:
+                rows = model.rowCount()
+                for r in range(rows):
+                    idx = model.index(r, self.cid_col)
+                    val = idx.data() if idx.isValid() else None
+                    if val:
+                        cids.append(str(val))
+            except Exception as e:
+                traceback.print_exc()
+            if not cids:
+                QMessageBox.information(self, "ไม่มีข้อมูล", "ไม่พบรายการผู้รับบริการในวันที่เลือก")
+                return
+            self._run_all_checks(cids)
+        except Exception as e:
+            traceback.print_exc()
+            QMessageBox.warning(self, "ผิดพลาด", str(e))
 
     def _check_and_update_rights(self, cid: str):
         """Call SRM for given CID and update rights in DB for selected date."""

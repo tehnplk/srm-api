@@ -1,4 +1,5 @@
 import sys
+import traceback
 from typing import Dict
 
 from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QMdiSubWindow
@@ -26,8 +27,8 @@ class Setting(QWidget, Setting_ui):
         self.cancel_button.clicked.connect(self.on_cancel)
         try:
             self.system_combo.currentTextChanged.connect(self.on_system_changed)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
         # Settings are loaded during UI setup via QSettings
 
@@ -117,8 +118,8 @@ class Setting(QWidget, Setting_ui):
                         database = "hosxp_pcu"
                     elif sys_l == "jhcis":
                         database = "jhcisdb"
-            except Exception:
-                pass
+            except Exception as e:
+                traceback.print_exc()
             self.host_edit.setText(host)
             self.port_spin.setValue(port)
             self.database_edit.setText(database)
@@ -142,17 +143,17 @@ class Setting(QWidget, Setting_ui):
                 self.database_edit.setText("hosxp_pcu")
                 try:
                     self.port_spin.setValue(3306)
-                except Exception:
-                    pass
+                except Exception as e:
+                    traceback.print_exc()
             elif sys_l == "jhcis":
                 # Always overwrite to default when switching to JHCIS
                 self.database_edit.setText("jhcisdb")
                 try:
                     self.port_spin.setValue(3333)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    traceback.print_exc()
+        except Exception as e:
+            traceback.print_exc()
 
     def on_cancel(self):
         """Close the Settings window, ensuring MDI subwindow wrapper is closed."""
@@ -166,7 +167,8 @@ class Setting(QWidget, Setting_ui):
             else:
                 # Not in MDI: just close this widget
                 self.close()
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             self.close()
 
 

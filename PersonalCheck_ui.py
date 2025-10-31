@@ -1,4 +1,5 @@
 import sys
+import traceback
 
 from PyQt6.QtWidgets import (
     QVBoxLayout,
@@ -34,8 +35,8 @@ class PersonalCheck_ui(object):
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         try:
             self.header_label.setStyleSheet("font-size: 20px; font-weight: 700; color: #2c3e50;")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         # Note: header will be placed inside input group box below
 
         # Create 13 separate input boxes for CID digits
@@ -51,8 +52,8 @@ class PersonalCheck_ui(object):
             edit.setFixedSize(48, 56)
             try:
                 edit.setStyleSheet("font-size: 32px; background-color: #0d6efd; color: #ffffff;")
-            except Exception:
-                pass
+            except Exception as e:
+                traceback.print_exc()
             self.cid_edits.append(edit)
             self.cid_layout.addWidget(edit)
             # Insert dash separators after positions 0, 4, 9, 11 (1-2345-67890-12-3)
@@ -60,8 +61,8 @@ class PersonalCheck_ui(object):
                 dash = QLabel("-", PersonalCheck_ui)
                 try:
                     dash.setStyleSheet("font-size: 28px; color: #666;")
-                except Exception:
-                    pass
+                except Exception as e:
+                    traceback.print_exc()
                 dash.setFixedWidth(14)
                 dash.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.cid_layout.addWidget(dash)
@@ -77,8 +78,8 @@ class PersonalCheck_ui(object):
                 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
                 """
             )
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         self.group_input_layout.addWidget(self.header_label)
         self.group_input_layout.addLayout(self.cid_layout)
         self.main_layout.addWidget(self.group_input)
@@ -122,15 +123,15 @@ class PersonalCheck_ui(object):
                 self.value_sex,
             ]:
                 w.setStyleSheet("font-size: 18px; font-weight: 600;")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
         def title(text):
             lbl = QLabel(text)
             try:
                 lbl.setStyleSheet("color: #555; font-size: 14px;")
-            except Exception:
-                pass
+            except Exception as e:
+                traceback.print_exc()
             return lbl
 
         # Row 0: วันที่ตรวจสอบ | เลขบัตรประชาชน
@@ -174,8 +175,8 @@ class PersonalCheck_ui(object):
             self.value_hosp_main.setStyleSheet("font-size: 18px; font-weight: 600;")
             self.value_hosp_sub.setStyleSheet("font-size: 18px; font-weight: 600;")
             self.value_right_no.setStyleSheet("font-size: 18px; font-weight: 600;")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
         # Row 3: สิทธิหลัก | สิทธิย่อย
         self.result_grid.addWidget(title("สิทธิหลัก"), 3, 0)
@@ -211,8 +212,8 @@ class PersonalCheck_ui(object):
                 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; background-color: transparent; }
                 """
             )
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         self.group_result_layout.addLayout(self.result_grid)
 
         # Log tabs at the bottom
@@ -220,16 +221,16 @@ class PersonalCheck_ui(object):
         self.log_tabs.setObjectName("log_tabs")
         try:
             self.log_tabs.setStyleSheet("QTabWidget::pane { border: 1px solid #e0e0e0; }")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
 
         # Tab 1: Log
         self.log_text = QTextEdit(PersonalCheck_ui)
         self.log_text.setReadOnly(True)
         try:
             self.log_text.setStyleSheet("font-family: Consolas, monospace; font-size: 13px;")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         self.log_tabs.addTab(self.log_text, "Log")
 
         # Tab 2: Response (raw)
@@ -237,8 +238,8 @@ class PersonalCheck_ui(object):
         self.raw_text.setReadOnly(True)
         try:
             self.raw_text.setStyleSheet("font-family: Consolas, monospace; font-size: 13px;")
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         self.log_tabs.addTab(self.raw_text, "Response")
 
         # Splitter between result and logs (vertical)
@@ -250,8 +251,8 @@ class PersonalCheck_ui(object):
             # Give more space to result by default
             self.result_log_splitter.setStretchFactor(0, 3)
             self.result_log_splitter.setStretchFactor(1, 2)
-        except Exception:
-            pass
+        except Exception as e:
+            traceback.print_exc()
         self.main_layout.addWidget(self.result_log_splitter)
 
     def retranslateUi(self, PersonalCheck_ui):

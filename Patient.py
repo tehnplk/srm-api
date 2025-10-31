@@ -137,7 +137,8 @@ class Patient(QWidget, Patient_ui):
                                 """
                             )
                             dead_cids = [str(r[0]) for r in (cur.fetchall() or []) if r and r[0]]
-                    except Exception:
+                    except Exception as e:
+                        traceback.print_exc()
                         dead_cids = []
 
                     if dead_cids:
@@ -273,8 +274,8 @@ class Patient(QWidget, Patient_ui):
                     except Exception as e:
                         traceback.print_exc()
                     self._start_rights_worker([(proxy_row, str(value))], debug=True, force=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    traceback.print_exc()
 
     def _read_token(self) -> str:
         import os
@@ -362,8 +363,8 @@ class Patient(QWidget, Patient_ui):
                         if self._stop:
                             try:
                                 print(f"[SKIP] CID={cid} reason=stop_requested")
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                traceback.print_exc()
                             break
                         try:
                             self.progress_row.emit(proxy_row)
@@ -441,8 +442,8 @@ class Patient(QWidget, Patient_ui):
                                 if isinstance(death_date, str) and death_date.strip():
                                     try:
                                         print(f"[DEBUG] DEATH ALERT CID={cid} deathDate={death_date}")
-                                    except Exception:
-                                        pass
+                                    except Exception as e:
+                                        traceback.print_exc()
                             except Exception:
                                 pass
                             upsert_srm_check(db_conn, cid, check_date, death_date, funds, resp.status_code)
@@ -498,8 +499,8 @@ class Patient(QWidget, Patient_ui):
                                             new_type = str(sub.get('id') or sub.get('name') or "")
                                             try:
                                                 sub_inscl_name = sub_inscl_name or str(sub.get('name') or "")
-                                            except Exception:
-                                                pass
+                                            except Exception as e:
+                                                traceback.print_exc()
                                     if not new_no:
                                         new_no = str(f0.get('cardId') or f0.get('cardID') or "")
                                     # Extract hosp codes and dates from funds[0]
@@ -519,7 +520,8 @@ class Patient(QWidget, Patient_ui):
                                             expire_date = f0.get('expireDateTime')
                                     except Exception:
                                         pass
-                            except Exception:
+                            except Exception as e:
+                                traceback.print_exc()
                                 new_type = ""
                                 new_no = ""
                             # Persist rights back to DB depending on system
@@ -635,9 +637,9 @@ class Patient(QWidget, Patient_ui):
                                                     db_conn.commit()
                                             except Exception:
                                                 pass
-                            except Exception:
+                            except Exception as e:
                                 # fail-soft; continue processing other rows
-                                pass
+                                traceback.print_exc()
                             try:
                                 self.update_rights.emit(proxy_row, cid, new_type, new_no)
                             except RuntimeError:
@@ -645,9 +647,9 @@ class Patient(QWidget, Patient_ui):
                             if isinstance(death_date, str) and death_date.strip():
                                 try:
                                     _update_patient_death_from_api(db_conn, cid, death_date)
-                                except Exception:
+                                except Exception as e:
                                     # fail-soft; do not block the loop
-                                    pass
+                                    traceback.print_exc()
                             succeeded += 1
                         else:
                             failed += 1
@@ -655,8 +657,8 @@ class Patient(QWidget, Patient_ui):
                 finally:
                     try:
                         db_conn.close()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        traceback.print_exc()
                     try:
                         if not self._stop:
                             self.finished_summary.emit(skipped_today, skipped_dead, succeeded, failed, token_expired)

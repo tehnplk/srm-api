@@ -1,5 +1,6 @@
 import os
 import json
+import traceback
 from datetime import datetime
 from typing import Optional
 
@@ -64,7 +65,8 @@ def _has_hosxp_death_flag(conn) -> bool:
                 """
             )
             return bool(cur.fetchone())
-    except Exception:
+    except Exception as e:
+        traceback.print_exc()
         return False
 
 
@@ -110,7 +112,8 @@ def is_patient_dead(conn, cid: str) -> bool:
                     return False
                 # Consider dead when dischargetype is not '9'
                 return str(dt).strip() != '9'
-            except Exception:
+            except Exception as e:
+                traceback.print_exc()
                 return False
 
 
@@ -119,7 +122,8 @@ def _normalize_check_date(check_date: Optional[str]) -> Optional[str]:
         try:
             dt = datetime.fromisoformat(check_date.replace('Z', '+00:00'))
             return dt.strftime('%Y-%m-%d %H:%M:%S')
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             return check_date.replace('T', ' ').replace('Z', '').split('.')[0]
     return None
 
@@ -131,11 +135,13 @@ def _normalize_death_date(death_date: Optional[str]) -> Optional[str]:
                 dtx = datetime.fromisoformat(death_date.replace('Z', '+00:00'))
                 return dtx.strftime('%Y-%m-%d')
             return death_date.split('T')[0].split(' ')[0]
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             try:
                 dtx = datetime.strptime(death_date, '%Y-%m-%d')
                 return dtx.strftime('%Y-%m-%d')
-            except Exception:
+            except Exception as e2:
+                traceback.print_exc()
                 return None
     return None
 
@@ -160,7 +166,8 @@ def upsert_srm_check(conn, cid: str, check_date: Optional[str], death_date: Opti
             subinscl_id = (sub.get('id') or None)
             subinscl_name = (sub.get('name') or None)
             card_id = f0.get('cardId') or None
-    except Exception:
+    except Exception as e:
+        traceback.print_exc()
         maininscl_id = maininscl_name = subinscl_id = subinscl_name = card_id = None
     with conn.cursor() as cur:
         cur.execute(
@@ -218,7 +225,8 @@ def refresh_token():
         try:
             err_js = resp.json()
             body_text = json.dumps(err_js, ensure_ascii=False)
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             body_text = (resp.text or "").strip()
         raise RuntimeError(f"การขอ token ใหม่เกิดข้อผิดพลาด (status={resp.status_code}): {body_text[:1000]}")
 
@@ -236,7 +244,8 @@ def refresh_token():
             access_line = f"access-token={acc}"
         if ref:
             refresh_line = f"refresh-token={ref}"
-    except Exception:
+    except Exception as e:
+        traceback.print_exc()
         # Fallback: parse plain text lines
         for ln in text.splitlines():
             s = ln.strip()
@@ -250,7 +259,8 @@ def refresh_token():
         try:
             err_js = js  # from above if available
             body_text = json.dumps(err_js, ensure_ascii=False)
-        except Exception:
+        except Exception as e:
+            traceback.print_exc()
             body_text = (text or "").strip()
         raise RuntimeError(f"การขอ token ใหม่เกิดข้อผิดพลาด (no access_token in response): {body_text[:1000]}")
 
