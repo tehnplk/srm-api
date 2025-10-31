@@ -39,6 +39,10 @@ class Main(QMainWindow, Main_ui):
         self.actionSetting.triggered.connect(self.show_setting)
         self.actionCheckUpdate.triggered.connect(self.show_check_update)
         self.actionAbout.triggered.connect(self.show_about)
+        try:
+            self.actionEligibilitySingle.triggered.connect(self.show_personal_check)
+        except Exception:
+            pass
         
         # Connect View menu actions
         self.actionTileWindows.triggered.connect(self.tile_windows)
@@ -94,6 +98,11 @@ class Main(QMainWindow, Main_ui):
         """Handle ตั้งค่า menu action"""
         from Setting import Setting
         self.show_mdi_child(Setting, "⚙️ ตั้งค่า", parent=self)
+
+    def show_personal_check(self):
+        """Handle 👤 ตรวจสอบสิทธิ (single) toolbar/menu action"""
+        from PersonalCheck import PersonalCheck
+        self.show_mdi_child(PersonalCheck, "👤 ตรวจสอบสิทธิ", parent=self)
 
     def show_check_update(self):
         """Check update from API, write new.txt if newer, and offer to download via Update.exe."""

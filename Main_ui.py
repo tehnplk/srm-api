@@ -43,20 +43,33 @@ class Main_ui(object):
         # ผู้ป่วย (Patient) action
         self.actionPatient = QAction(MainWindow)
         self.actionPatient.setObjectName("actionPatient")
-        self.actionPatient.setText("📋 รายชื่อ")
-        self.actionPatient.setStatusTip("จัดการรายชื่อ")
-        self.menuFile.addAction(self.actionPatient)
+        self.actionPatient.setText("📋 รายชื่อทั้งหมด")
+        self.actionPatient.setStatusTip("ตรวจสอบสิทธิของรายชื่อทั้งหมด")
+        
 
         # ผู้รับบริการวันนี้ action
         self.actionPatientToday = QAction(MainWindow)
         self.actionPatientToday.setObjectName("actionPatientToday")
         self.actionPatientToday.setText("📅 ผู้รับบริการวันนี้")
-        self.actionPatientToday.setStatusTip("รายการผู้รับบริการที่ตรวจสิทธิวันนี้")
-        self.menuFile.addAction(self.actionPatientToday)
+        self.actionPatientToday.setStatusTip("ตรวจสอบสิทธิของผู้รับบริการวันนี้")
+        
+        # ตรวจสอบสิทธิ (Single) toolbar action
+        self.actionEligibilitySingle = QAction(MainWindow)
+        self.actionEligibilitySingle.setObjectName("actionEligibilitySingle")
+        self.actionEligibilitySingle.setText("👤 ตรวจสอบสิทธิ")
+        self.actionEligibilitySingle.setStatusTip("ตรวจสอบสิทธิรายบุคคล")
 
-        # Separator
+        # Add single eligibility action to File menu
+        self.menuFile.addAction(self.actionEligibilitySingle)
+
+        # ตรวจสอบสิทธิรายกลุ่ม (Main) menu with sub-items
+        self.menuEligibility = self.menuFile.addMenu("ตรวจสอบสิทธิรายกลุ่ม")
+        self.menuEligibility.setObjectName("menuEligibility")
+        self.menuEligibility.setTitle("➕ ตรวจสอบสิทธิรายกลุ่ม")
+        self.menuEligibility.addAction(self.actionPatient)
+        self.menuEligibility.addAction(self.actionPatientToday)
+
         self.menuFile.addSeparator()
-
         # ตั้งค่า action
         self.actionSetting = QAction(MainWindow)
         self.actionSetting.setObjectName("actionSetting")
@@ -116,11 +129,14 @@ class Main_ui(object):
         self.toolBar.setIconSize(QSize(32, 32))
         MainWindow.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolBar)
 
-        # Add ผู้ป่วย button to toolbar
+        # Add quick single eligibility action
+        self.toolBar.addAction(self.actionEligibilitySingle)
+
+        # Expose submenu items as direct toolbar buttons
         self.toolBar.addAction(self.actionPatient)
-        # Add ผู้รับบริการวันนี้ button to toolbar
         self.toolBar.addAction(self.actionPatientToday)
-        # Add ตั้งค่า button to toolbar
+
+        # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)
 
         # Create status bar
