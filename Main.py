@@ -268,6 +268,59 @@ if __name__ == "__main__":
     except Exception:
         pass
     app.setOrganizationName("SRM Team")
+    try:
+        app.setStyleSheet(
+            """
+            QMainWindow { background-color: #f5f7fb; }
+            QMdiArea { background: #f5f7fb; }
+            QMdiSubWindow { background: #ffffff; border: 1px solid #e6e8ef; border-radius: 8px; }
+
+            QMenuBar { background: #ffffff; border-bottom: 1px solid #e6e8ef; }
+            QMenuBar::item { padding: 6px 10px; margin: 2px; border-radius: 6px; }
+            QMenuBar::item:selected { background: #e9f2ff; }
+            QMenu { background: #ffffff; border: 1px solid #e6e8ef; }
+            QMenu::item { padding: 6px 12px; border-radius: 4px; }
+            QMenu::item:selected { background: #e9f2ff; }
+
+            QToolBar { background: #ffffff; border: 1px solid #e6e8ef; spacing: 6px; padding: 6px; }
+            QToolButton { background: #f0f4ff; border: 1px solid #d6e4ff; padding: 6px 10px; border-radius: 8px; }
+            QToolButton:hover { background: #e6f0ff; }
+            QToolButton:pressed { background: #dbe8ff; }
+
+            QStatusBar { background: #ffffff; border-top: 1px solid #e6e8ef; }
+
+            QPushButton { background-color: #0d6efd; color: #ffffff; border: 1px solid #0b5ed7; border-radius: 8px; padding: 8px 14px; font-weight: 600; }
+            QPushButton:hover { background-color: #0b5ed7; }
+            QPushButton:pressed { background-color: #0a58ca; }
+            QPushButton:disabled { background-color: #cbd5e1; color: #6b7280; border-color: #cbd5e1; }
+
+            QLineEdit, QTextEdit, QPlainTextEdit { background: #ffffff; border: 1px solid #d9dee9; border-radius: 8px; padding: 6px 10px; }
+            QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus { border: 1px solid #86b7fe; }
+
+            QGroupBox { background-color: #ffffff; border: 1px solid #e6e8ef; border-radius: 10px; margin-top: 10px; }
+            QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 6px; background: transparent; }
+
+            QTabWidget::pane { border: 1px solid #e6e8ef; border-radius: 8px; background: #ffffff; }
+            QTabBar::tab { background: #f2f5fb; border: 1px solid #e6e8ef; padding: 8px 14px; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-right: 4px; }
+            QTabBar::tab:selected { background: #ffffff; border-bottom-color: #ffffff; }
+            QTabBar::tab:hover { background: #e9f2ff; }
+
+            QTableView { background: #ffffff; border: 1px solid #e6e8ef; gridline-color: #eef0f6; selection-background-color: #e9f2ff; selection-color: #0f172a; }
+            QHeaderView::section { background: #f8fafc; border: 1px solid #e6e8ef; padding: 6px 8px; font-weight: 600; }
+
+            QScrollBar:vertical { background: transparent; width: 12px; margin: 0; }
+            QScrollBar::handle:vertical { background: #cbd5e1; border-radius: 6px; min-height: 24px; }
+            QScrollBar::handle:vertical:hover { background: #94a3b8; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+            QScrollBar:horizontal { background: transparent; height: 12px; margin: 0; }
+            QScrollBar::handle:horizontal { background: #cbd5e1; border-radius: 6px; min-width: 24px; }
+            QScrollBar::handle:horizontal:hover { background: #94a3b8; }
+
+            QMessageBox { background: #ffffff; }
+            """
+        )
+    except Exception:
+        pass
     # Set application icon
     script_dir = os.path.dirname(os.path.abspath(__file__))
     icon_path = os.path.join(script_dir, "check.png")
