@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QFont
 
 
 class PatientToday_ui(object):
@@ -41,22 +41,23 @@ class PatientToday_ui(object):
         )
         self.main_layout.addWidget(self.title_label)
 
-        # Create date picker layout
-        self.date_layout = QHBoxLayout()
+        # Top bar layout (Patient-like) + keep date picker
+        self.top_bar = QHBoxLayout()
+        self.top_bar.setSpacing(8)
 
+        # Date picker (kept)
         self.date_label = QLabel("วันที่:", PatientToday_ui)
-        self.date_layout.addWidget(self.date_label)
+        self.top_bar.addWidget(self.date_label)
 
         self.date_edit = QDateEdit(PatientToday_ui)
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
         try:
-            self.date_edit.setFixedHeight(44)
-            self.date_edit.setMinimumWidth(180)
-            self.date_edit.setStyleSheet("font-size: 18px; padding: 6px 12px;")
+            self.date_edit.setFixedHeight(32)
+            self.date_edit.setMinimumWidth(140)
+            self.date_edit.setFont(QFont("Segoe UI", 11))
         except Exception:
             pass
-        # Style calendar popup: make month/year selectors black
         try:
             cal = self.date_edit.calendarWidget()
             if cal is not None:
@@ -69,30 +70,51 @@ class PatientToday_ui(object):
                 )
         except Exception:
             pass
-        self.date_layout.addWidget(self.date_edit)
+        self.top_bar.addWidget(self.date_edit)
 
-        # Add check rights button
-        self.check_rights_button = QPushButton("ตรวจสอบสิทธิ", PatientToday_ui)
-        icon_path = os.path.join(os.path.dirname(__file__), "check.png")
-        self.check_rights_button.setIcon(QIcon(icon_path))
-        self.check_rights_button.setIconSize(QSize(20, 20))
-        self.date_layout.addWidget(self.check_rights_button)
+        # Buttons (same as Patient)
+        self.refresh_button = QPushButton("🔄 Refresh Token", PatientToday_ui)
+        self.refresh_button.setMinimumWidth(140)
+        self.refresh_button.setFont(QFont("Segoe UI", 11))
+        self.top_bar.addWidget(self.refresh_button)
 
-        # Push contents to the left
-        self.date_layout.addStretch()
+        self.check_rights_button = QPushButton("✅ ตรวจสอบสิทธิ", PatientToday_ui)
+        self.check_rights_button.setMinimumWidth(160)
+        self.check_rights_button.setFont(QFont("Segoe UI", 11))
+        self.top_bar.addWidget(self.check_rights_button)
 
-        # Add date layout to main layout
-        self.main_layout.addLayout(self.date_layout)
+        self.stop_rights_button = QPushButton("⏹ หยุดตรวจสอบสิทธิ", PatientToday_ui)
+        self.stop_rights_button.setMinimumWidth(180)
+        self.stop_rights_button.setFont(QFont("Segoe UI", 11))
+        self.top_bar.addWidget(self.stop_rights_button)
 
-        # Create table view
-        self.visit_table = QTableView(PatientToday_ui)
-        self.main_layout.addWidget(self.visit_table)
+        self.top_bar.addStretch(1)
+        self.main_layout.addLayout(self.top_bar)
+
+        # Table view (same name as Patient)
+        self.table = QTableView(PatientToday_ui)
+        self.table.setFont(QFont("Segoe UI", 11))
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setSortingEnabled(True)
+        self.table.setAlternatingRowColors(True)
+        try:
+            self.table.setStyleSheet(
+                "QTableView::item:selected{background:#FFE5B4;color:black;}"
+                "QTableView::item:selected:active{background:#FFE5B4;color:black;}"
+                "QTableView::item:selected:!active{background:#FFE5B4;color:black;}"
+            )
+        except Exception:
+            pass
+        self.main_layout.addWidget(self.table)
+
+        # Backward compatibility: expose visit_table alias
+        self.visit_table = self.table
 
     def retranslateUi(self, PatientToday_ui):
         PatientToday_ui.setWindowTitle("ผู้รับบริการวันนี้")
         self.title_label.setText("ผู้รับบริการวันนี้")
         self.date_label.setText("วันที่:")
-        self.check_rights_button.setText("ตรวจสอบสิทธิ")
+        self.check_rights_button.setText("✅ ตรวจสอบสิทธิ")
 
 
 if __name__ == "__main__":
