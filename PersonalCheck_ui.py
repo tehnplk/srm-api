@@ -50,7 +50,7 @@ class PersonalCheck_ui(object):
             edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
             edit.setFixedSize(48, 56)
             try:
-                edit.setStyleSheet("font-size: 32px;")
+                edit.setStyleSheet("font-size: 32px; background-color: #0d6efd; color: #ffffff;")
             except Exception:
                 pass
             self.cid_edits.append(edit)
