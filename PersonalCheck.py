@@ -6,7 +6,7 @@ from PyQt6.QtGui import QIntValidator, QGuiApplication, QKeySequence
 
 from PersonalCheck_ui import PersonalCheck_ui
 from srm import read_token, call_right_search, refresh_token
-
+from QtSmartCard import SmartCardObserver
 
 class PersonalCheck(QWidget, PersonalCheck_ui):
     def __init__(self, parent=None):
@@ -15,6 +15,10 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
 
         # Initialize CID inputs behavior
         self._init_cid_inputs()
+        self.smc = SmartCardObserver(read_photo=True)
+        self.smc.signal_data.connect(self.smc_data)
+        self.smc.signal_photo.connect(self.smc_photo)
+        self.smc.signal_state.connect(self.smc_state)
 
     def on_check(self):
         try:
@@ -273,6 +277,144 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                 self.cid_preview.setText(self._fmt_pid(digits))
         except Exception as e:
             traceback.print_exc()
+
+    def _clear_results(self):
+        try:
+            # Clear CID edits
+            for e in getattr(self, 'cid_edits', []) or []:
+                try:
+                    e.clear()
+                except Exception:
+                    pass
+            # Clear preview
+            try:
+                if hasattr(self, 'cid_preview') and self.cid_preview is not None:
+                    self.cid_preview.clear()
+            except Exception:
+                pass
+            # Clear labels
+            for attr in [
+                'value_check_date','value_pid','value_tname','value_fname','value_lname',
+                'value_nation','value_birth_date','value_sex','value_main_inscl','value_sub_inscl',
+                'value_hosp_main','value_hosp_sub','value_right_no']:
+                try:
+                    w = getattr(self, attr, None)
+                    if w is not None:
+                        w.clear()
+                except Exception:
+                    pass
+            # Clear raw response
+            try:
+                if hasattr(self, 'raw_text') and self.raw_text is not None:
+                    self.raw_text.clear()
+            except Exception:
+                pass
+            # Clear table/model
+            try:
+                if hasattr(self, 'result_table') and self.result_table is not None:
+                    self.result_table.setModel(None)
+            except Exception:
+                pass
+            # Focus first CID field
+            try:
+                edits = getattr(self, 'cid_edits', []) or []
+                if edits:
+                    edits[0].setFocus()
+                    try:
+                        edits[0].selectAll()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        except Exception:
+            traceback.print_exc()
+
+    # ===== SmartCard handlers: read only CID and fill inputs =====
+    def _fill_cid_from_string(self, cid_text: str):
+        try:
+            digits = ''.join(ch for ch in str(cid_text) if ch.isdigit())[:13]
+            if not digits:
+                return
+            # clear and fill each edit
+            edits = getattr(self, 'cid_edits', [])
+            for i, edit in enumerate(edits):
+                try:
+                    ch = digits[i] if i < len(digits) else ''
+                    edit.setText(ch)
+                except Exception:
+                    traceback.print_exc()
+            # focus last filled
+            try:
+                last_i = min(len(digits), len(edits)) - 1
+                if last_i >= 0:
+                    edits[last_i].setFocus()
+                    try:
+                        edits[last_i].selectAll()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            # update preview
+            self._update_pid_preview()
+            # auto-submit if fully filled (13 digits)
+            if len(digits) == 13:
+                try:
+                    self._on_submit_cid()
+                except Exception:
+                    traceback.print_exc()
+        except Exception as e:
+            traceback.print_exc()
+
+    def smc_state(self, info: dict):
+        try:
+            print(f"[SMC] state: {info}")
+            state = (info or {}).get('state')
+            if state == 'removed':
+                # Clear CID and results on card removal
+                self._clear_results()
+        except Exception:
+            traceback.print_exc()
+
+    def smc_data(self, data: dict):
+        try:
+            print(f"[SMC] data: {data}")
+            # Only care about citizen id
+            cid = (data or {}).get('cid')
+            if cid and str(cid).strip().lower() != 'err':
+                self._fill_cid_from_string(str(cid))
+        except Exception:
+            traceback.print_exc()
+
+    def smc_photo(self, data: dict):
+        # Ignore photo per requirement (read CID only)
+        try:
+            try:
+                img = (data or {}).get('img')
+                if isinstance(img, (bytes, bytearray)):
+                    print(f"[SMC] photo bytes: {len(img)}")
+                else:
+                    print(f"[SMC] photo: {type(img)}")
+            except Exception:
+                pass
+        except Exception:
+            traceback.print_exc()
+
+    def closeEvent(self, event):
+        try:
+            if hasattr(self, 'smc') and self.smc is not None:
+                try:
+                    self.smc.stop()
+                except Exception:
+                    pass
+                try:
+                    if self.smc.isRunning():
+                        self.smc.quit()
+                        self.smc.wait(2000)
+                except Exception:
+                    pass
+        except Exception:
+            traceback.print_exc()
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":
