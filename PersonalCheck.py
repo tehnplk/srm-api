@@ -163,6 +163,13 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
         except Exception:
             pass
 
+    def _dash(self, value) -> str:
+        try:
+            text = str(value if value is not None else "").strip()
+            return text if text else "-"
+        except Exception:
+            return "-"
+
     def _log(self, message: str):
         try:
             if hasattr(self, 'log_text') and self.log_text is not None:
@@ -269,23 +276,23 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                 QMessageBox.warning(self, "ข้อมูลไม่ถูกต้อง", str(e))
                 return
 
-            # Update UI labels if present
-            self._set_text_if_exists('value_check_date', str(data.get('checkDate', '')))
-            self._set_text_if_exists('value_pid', self._fmt_pid(data.get('pid', '')))
-            self._set_text_if_exists('value_tname', str(data.get('tname', '')))
-            self._set_text_if_exists('value_fname', str(data.get('fname', '')))
-            self._set_text_if_exists('value_lname', str(data.get('lname', '')))
-            self._set_text_if_exists('value_nation', str(((data.get('nation') or {}).get('name')) or ''))
-            self._set_text_if_exists('value_birth_date', str(data.get('birthDate', '')))
-            self._set_text_if_exists('value_sex', str(((data.get('sex') or {}).get('name')) or ''))
+            # Update UI labels if present (use '-' when missing)
+            self._set_text_if_exists('value_check_date', self._dash(data.get('checkDate', '')))
+            self._set_text_if_exists('value_pid', self._dash(self._fmt_pid(data.get('pid', ''))))
+            self._set_text_if_exists('value_tname', self._dash(data.get('tname', '')))
+            self._set_text_if_exists('value_fname', self._dash(data.get('fname', '')))
+            self._set_text_if_exists('value_lname', self._dash(data.get('lname', '')))
+            self._set_text_if_exists('value_nation', self._dash((data.get('nation') or {}).get('name')))
+            self._set_text_if_exists('value_birth_date', self._dash(data.get('birthDate', '')))
+            self._set_text_if_exists('value_sex', self._dash((data.get('sex') or {}).get('name')))
 
             funds = data.get('funds') or []
             f0 = funds[0] if funds else {}
-            self._set_text_if_exists('value_main_inscl', self._fmt_code_name(f0.get('mainInscl')))
-            self._set_text_if_exists('value_sub_inscl', self._fmt_code_name(f0.get('subInscl')))
-            self._set_text_if_exists('value_hosp_main', self._fmt_code_name(f0.get('hospMain')))
-            self._set_text_if_exists('value_hosp_sub', self._fmt_code_name(f0.get('hospSub')))
-            self._set_text_if_exists('value_right_no', str(f0.get('cardId') or ''))
+            self._set_text_if_exists('value_main_inscl', self._dash(self._fmt_code_name(f0.get('mainInscl'))))
+            self._set_text_if_exists('value_sub_inscl', self._dash(self._fmt_code_name(f0.get('subInscl'))))
+            self._set_text_if_exists('value_hosp_main', self._dash(self._fmt_code_name(f0.get('hospMain'))))
+            self._set_text_if_exists('value_hosp_sub', self._dash(self._fmt_code_name(f0.get('hospSub'))))
+            self._set_text_if_exists('value_right_no', self._dash(f0.get('cardId')))
 
             self._log("[OK] อัปเดตผลการตรวจสอบสิทธิเรียบร้อย")
         except Exception as e:
