@@ -22,6 +22,40 @@ class Main_ui(object):
         MainWindow.setObjectName("MainWindow")
         MainWindow.setWindowTitle("HisHelp")
         MainWindow.resize(1200, 800)
+        try:
+            MainWindow.setStyleSheet(
+                """
+                /* Base window */
+                QMainWindow { background-color: #f5f7fb; }
+                QMdiArea { background: #f5f7fb; }
+
+                /* Menubar */
+                QMenuBar { background: #ffffff; border-bottom: 1px solid #e6e8ef; }
+                QMenuBar::item { padding: 6px 10px; margin: 2px; border-radius: 6px; }
+                QMenuBar::item:selected { background: #e9f2ff; }
+
+                /* Menus */
+                QMenu { background: #ffffff; border: 1px solid #e6e8ef; }
+                QMenu::item { padding: 6px 12px; border-radius: 4px; }
+                QMenu::item:selected { background: #e9f2ff; }
+
+                /* Toolbar */
+                QToolBar { background: #ffffff; border: 1px solid #e6e8ef; spacing: 6px; padding: 6px; }
+                QToolButton { 
+                    background: #f0f4ff; 
+                    border: 1px solid #d6e4ff; 
+                    padding: 6px 10px; 
+                    border-radius: 8px; 
+                }
+                QToolButton:hover { background: #e6f0ff; }
+                QToolButton:pressed { background: #dbe8ff; }
+
+                /* Status bar */
+                QStatusBar { background: #ffffff; border-top: 1px solid #e6e8ef; }
+                """
+            )
+        except Exception:
+            pass
         
         # Create central widget (MDI Area)
         self.centralwidget = QMdiArea()
@@ -127,6 +161,15 @@ class Main_ui(object):
         self.toolBar.setObjectName("toolBar")
         self.toolBar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.toolBar.setIconSize(QSize(32, 32))
+        try:
+            self.toolBar.setMovable(True)
+            self.toolBar.setAllowedAreas(
+                Qt.ToolBarArea.LeftToolBarArea
+                | Qt.ToolBarArea.RightToolBarArea
+                | Qt.ToolBarArea.TopToolBarArea
+            )
+        except Exception:
+            pass
         MainWindow.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolBar)
 
         # Add quick single eligibility action
