@@ -176,12 +176,7 @@ class Main_ui(object):
         self.menuEligibility.addAction(self.actionPatient)
         self.menuEligibility.addAction(self.actionPatientToday)
 
-        # ตรวจสอบ43แฟ้ม action
-        self.actionF43Check = QAction(MainWindow)
-        self.actionF43Check.setObjectName("actionF43Check")
-        self.actionF43Check.setText("📁 ตรวจสอบ43แฟ้ม")
-        self.actionF43Check.setStatusTip("ตรวจสอบมาตรฐานแฟ้ม 43 แฟ้ม")
-        self.menuFile.addAction(self.actionF43Check)
+        
 
         self.menuFile.addSeparator()
         # ตั้งค่า action
@@ -258,8 +253,7 @@ class Main_ui(object):
         # Expose submenu items as direct toolbar buttons
         self.toolBar.addAction(self.actionPatient)
         self.toolBar.addAction(self.actionPatientToday)
-        # Add F43Check to toolbar
-        self.toolBar.addAction(self.actionF43Check)
+        
 
         # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)

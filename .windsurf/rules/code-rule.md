@@ -9,3 +9,5 @@ trigger: always_on
 - Long task should implement by Qthread.
 - A child form can be opened from both the Menu and the Toolbar.
 - When a module is removed, its menu should also be removed.
+- Do not use nested or unnecessary try-except blocks.
+- Always print the error message to the console in each try-except block.

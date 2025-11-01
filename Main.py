@@ -44,11 +44,7 @@ class Main(QMainWindow, Main_ui):
             self.actionEligibilitySingle.triggered.connect(self.show_personal_check)
         except Exception as e:
             traceback.print_exc()
-        # F43Check action
-        try:
-            self.actionF43Check.triggered.connect(self.show_f43check)
-        except Exception:
-            traceback.print_exc()
+        
         
         # Connect View menu actions
         self.actionTileWindows.triggered.connect(self.tile_windows)
@@ -120,10 +116,7 @@ class Main(QMainWindow, Main_ui):
         from PersonalCheck import PersonalCheck
         self.show_mdi_child(PersonalCheck, "👤 ตรวจสอบสิทธิ", parent=self)
 
-    def show_f43check(self):
-        """Handle ตรวจสอบ43แฟ้ม menu action"""
-        from F43Check import F43Check
-        self.show_mdi_child(F43Check, "📁 ตรวจสอบ43แฟ้ม", parent=self)
+    
 
     def show_check_update(self):
         """Check update from API, write new.txt if newer, and offer to download via Update.exe."""
