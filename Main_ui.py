@@ -258,6 +258,8 @@ class Main_ui(object):
         # Expose submenu items as direct toolbar buttons
         self.toolBar.addAction(self.actionPatient)
         self.toolBar.addAction(self.actionPatientToday)
+        # Add F43Check to toolbar
+        self.toolBar.addAction(self.actionF43Check)
 
         # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)
