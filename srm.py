@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 import requests
+from requests.exceptions import JSONDecodeError as RequestsJSONDecodeError
 
 
 def read_token() -> str:
@@ -244,7 +245,7 @@ def refresh_token():
             access_line = f"access-token={acc}"
         if ref:
             refresh_line = f"refresh-token={ref}"
-    except Exception as e:
+    except (json.JSONDecodeError, RequestsJSONDecodeError) as e:
         traceback.print_exc()
         # Fallback: parse plain text lines
         for ln in text.splitlines():

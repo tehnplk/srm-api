@@ -18,6 +18,7 @@ from srm import (
     update_patient_death,
     call_right_search,
     refresh_token,
+    _has_hosxp_death_flag,
 )
 
 
@@ -338,13 +339,14 @@ class Patient(QWidget, Patient_ui):
             finished_summary = pyqtSignal(int, int, int, int, bool)  # skipped_today, skipped_dead, succeeded, failed, token_expired
             need_resume_from = pyqtSignal(int)  # row index to resume from when token expired
             update_rights = pyqtSignal(int, str, str, str)  # proxy_row, cid, pttype_new, pttype_no_new
-            def __init__(self, system: str, debug: bool = False, force: bool = False):
+            def __init__(self, system: str, patient_instance, debug: bool = False, force: bool = False):
                 super().__init__()
                 self._stop = False
                 self._debug = bool(debug)
                 self._force_recheck = bool(force)
                 self._alerted_once = False
                 self._system = (system or "").lower()
+                self._patient = patient_instance
             def request_stop(self):
                 self._stop = True
 
@@ -646,7 +648,7 @@ class Patient(QWidget, Patient_ui):
                                 pass
                             if isinstance(death_date, str) and death_date.strip():
                                 try:
-                                    _update_patient_death_from_api(db_conn, cid, death_date)
+                                    self._patient._update_patient_death_from_api(db_conn, cid, death_date)
                                 except Exception as e:
                                     # fail-soft; do not block the loop
                                     traceback.print_exc()
@@ -674,7 +676,7 @@ class Patient(QWidget, Patient_ui):
         self._pending_force = bool(force)
 
         self._thread = QThread(self)
-        self._worker = RightsWorker(system=system, debug=debug, force=force)
+        self._worker = RightsWorker(system=system, patient_instance=self, debug=debug, force=force)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
 

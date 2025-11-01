@@ -28,3 +28,5 @@ if  response.status_code == 200:
     print(json.dumps(response.json(), indent=2, ensure_ascii=False))
 else:
     print(f"Error: {response.status_code}")
+    print(f"Response text: {response.text}")
+    print(f"Headers: {response.headers}")
