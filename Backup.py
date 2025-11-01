@@ -8,6 +8,7 @@ from datetime import datetime
 
 from PyQt6.QtWidgets import QWidget, QMessageBox, QFileDialog
 from PyQt6.QtCore import QSettings, QThread, pyqtSignal, QObject
+from PyQt6.QtGui import QCloseEvent
 
 from Backup_ui import Backup_ui
 from pymysql.constants import FIELD_TYPE
@@ -135,13 +136,35 @@ class Backup(QWidget, Backup_ui):
 
     def _cleanup_thread(self):
         try:
+            # Request stop first
+            if self._worker:
+                self._worker.request_stop()
+            
+            # Wait for thread to finish with timeout
             if self._thread:
-                self._thread.quit()
-                self._thread.wait(5000)
+                if self._thread.isRunning():
+                    self._thread.quit()
+                    if not self._thread.wait(3000):  # 3 second timeout
+                        # Force terminate if still running
+                        try:
+                            self._thread.terminate()
+                            self._thread.wait(1000)  # Additional 1 second for termination
+                        except Exception:
+                            pass
         except Exception:
             traceback.print_exc()
         self._thread = None
         self._worker = None
+
+    def closeEvent(self, event: QCloseEvent):
+        """Handle form close event to clean up threads properly"""
+        try:
+            self.on_stop()  # Request stop
+            self._cleanup_thread()  # Clean up thread
+            event.accept()
+        except Exception:
+            traceback.print_exc()
+            event.accept()  # Always accept close to prevent hanging
 
     def on_ui_reset(self):
         try:
@@ -181,24 +204,41 @@ class BackupWorker(QObject):
         self._db_config = dict(db_config or {})
         self._zip_path = zip_path
         self._stop = False
+        self._conn = None  # Store connection for cleanup
 
     def request_stop(self):
         self._stop = True
+        # Close connection to speed up stop
+        if self._conn:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
 
-    def _escape(self, val):
+    def _escape(self, val, max_length=None):
         if val is None:
-            return "NULL"
+            return "''"  # Navicat uses empty string for null
         if isinstance(val, (int, float)):
-            return str(val)
+            return f"'{val}'"  # Navicat quotes all numbers
         if isinstance(val, (bytes, bytearray)):
             try:
                 return "0x" + bytes(val).hex()
             except Exception:
-                return "NULL"
+                return "''"
         try:
             s = str(val)
         except Exception:
             s = repr(val)
+        
+        # Handle string 'None' values - convert to empty string
+        if s == 'None':
+            s = ''
+        
+        # Handle data too long by truncating if max_length is specified
+        if max_length and len(s) > max_length:
+            s = s[:max_length]
+            
         s = s.replace("\\", "\\\\").replace("'", "\\'")
         return f"'{s}'"
 
@@ -212,7 +252,14 @@ class BackupWorker(QObject):
                 conv[FIELD_TYPE.NEWDECIMAL] = lambda x: x
             except Exception:
                 pass
-            conn = pymysql.connect(**self._db_config, conv=conv)
+            self._conn = pymysql.connect(**self._db_config, conv=conv)
+            conn = self._conn
+            
+            # Check if stop was requested during connection
+            if self._stop:
+                self.log_line.emit("หยุดโดยผู้ใช้")
+                self.ask_ui_reset.emit()
+                return
             dbname = self._db_config.get("database")
             # Prepare header info from settings and server
             source_host = str(self._db_config.get("host") or "localhost")
@@ -314,6 +361,7 @@ class BackupWorker(QObject):
                         col_is_datetime = []
                         col_is_stringy = []  # char/varchar/text/enum/set
                         col_is_blob = []     # blob/binary
+                        col_max_lengths = []  # Store max lengths for string columns
                         for r in col_rows:
                             try:
                                 name = r[0]
@@ -338,11 +386,29 @@ class BackupWorker(QObject):
                                 is_dt = any(k in tl for k in ['date', 'datetime', 'time', 'timestamp', 'year'])
                                 is_str = any(k in tl for k in ['char', 'text', 'enum', 'set'])
                                 is_blob = any(k in tl for k in ['blob', 'binary'])
+                                
+                                # Extract max length from column type for string columns
+                                max_len = None
+                                # For Navicat compatibility, we don't truncate data
+                                # Only set max_len for very long text fields to prevent SQL syntax issues
+                                if is_str:
+                                    import re
+                                    match = re.search(r'(\d+)', tstr)
+                                    if match:
+                                        try:
+                                            max_len = int(match.group(1))
+                                            # For Navicat compatibility, only truncate extremely long values (> 10000 chars)
+                                            if max_len <= 10000:
+                                                max_len = None  # Don't truncate at all
+                                        except Exception:
+                                            max_len = None
+                                
                                 col_names.append(name)
                                 col_is_numeric.append(is_num)
                                 col_is_datetime.append(is_dt)
                                 col_is_stringy.append(is_str)
                                 col_is_blob.append(is_blob)
+                                col_max_lengths.append(max_len)
                             except Exception:
                                 traceback.print_exc()
                         if not col_names:
@@ -351,6 +417,7 @@ class BackupWorker(QObject):
                             col_is_datetime = []
                             col_is_stringy = []
                             col_is_blob = []
+                            col_max_lengths = []
                         select_expr = ", ".join([f"CAST(`{c}` AS BINARY) AS `{c}`" for c in col_names]) if col_names else "*"
                         cur.execute(f"SELECT {select_expr} FROM `{t}`")
                         rows = cur.fetchall() or []
@@ -367,31 +434,22 @@ class BackupWorker(QObject):
                                     is_dt = col_is_datetime[idx] if idx < len(col_is_datetime) else False
                                     is_str = col_is_stringy[idx] if idx < len(col_is_stringy) else False
                                     is_bin = col_is_blob[idx] if idx < len(col_is_blob) else False
-                                    if v is None:
-                                        out_vals.append("null")
-                                        continue
-                                    if is_num:
-                                        if isinstance(v, (bytes, bytearray)):
-                                            try:
-                                                sval = bytes(v).decode('ascii', 'ignore')
-                                            except Exception:
-                                                sval = '0'
-                                        else:
-                                            sval = str(v)
-                                        sval = sval.strip() or '0'
-                                        out_vals.append(sval)
-                                    elif is_bin:
+                                    max_len = col_max_lengths[idx] if idx < len(col_max_lengths) else None
+                                    
+                                    # For Navicat compatibility, use _escape for all values
+                                    if is_bin:
                                         try:
                                             b = bytes(v) if isinstance(v, (bytes, bytearray)) else str(v).encode('utf-8', 'ignore')
                                             out_vals.append('0x' + b.hex())
                                         except Exception:
-                                            out_vals.append('null')
-                                    elif is_dt or is_str:
-                                        # decode text with utf-8 -> tis-620 -> latin-1 fallback
+                                            out_vals.append('\'\'')
+                                    else:
+                                        # For all other types (numeric, datetime, string), use _escape
+                                        # decode text with tis-620 -> utf-8 -> latin-1 fallback (Navicat order)
                                         s = None
                                         if isinstance(v, (bytes, bytearray)):
                                             b = bytes(v)
-                                            for enc in ('utf-8', 'tis-620', 'latin-1'):
+                                            for enc in ('tis-620', 'utf-8', 'latin-1', 'cp874'):
                                                 try:
                                                     s = b.decode(enc)
                                                     break
@@ -399,22 +457,14 @@ class BackupWorker(QObject):
                                                     s = None
                                         else:
                                             s = str(v)
-                                        if s is None:
-                                            out_vals.append('null')
-                                        else:
-                                            s = s.replace("\\", "\\\\").replace("'", "\\'")
-                                            out_vals.append(f"'{s}'")
-                                    else:
-                                        # default to quoted text
-                                        try:
-                                            if isinstance(v, (bytes, bytearray)):
-                                                s = bytes(v).decode('utf-8', 'ignore')
-                                            else:
-                                                s = str(v)
-                                            s = s.replace("\\", "\\\\").replace("'", "\\'")
-                                            out_vals.append(f"'{s}'")
-                                        except Exception:
-                                            out_vals.append('null')
+                                        
+                                        # Handle string 'None' values - convert to empty string
+                                        if s == 'None':
+                                            s = ''
+                                        
+                                        # Use the enhanced _escape method with max_length (if any)
+                                        escaped = self._escape(s, max_len)
+                                        out_vals.append(escaped)
                                 values = ", ".join(out_vals)
                                 f.write(f"INSERT INTO `{t}` VALUES ({values});\n")
                 done += 1
@@ -526,12 +576,23 @@ class BackupWorker(QObject):
                     p = os.path.join(tmp_dir, name)
                     if os.path.isfile(p):
                         zf.write(p, arcname=name)
+            
+            self.log_line.emit("Navicat-style backup completed successfully")
             self.finished_ok.emit(self._zip_path)
         except Exception as e:
             traceback.print_exc()
             self.finished_error.emit(str(e))
         finally:
             try:
+                # Clean up connection
+                if self._conn:
+                    try:
+                        self._conn.close()
+                    except Exception:
+                        pass
+                    self._conn = None
+                    
+                # Clean up temp directory
                 if tmp_dir and os.path.isdir(tmp_dir):
                     shutil.rmtree(tmp_dir, ignore_errors=True)
             except Exception:
