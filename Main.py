@@ -44,6 +44,11 @@ class Main(QMainWindow, Main_ui):
             self.actionEligibilitySingle.triggered.connect(self.show_personal_check)
         except Exception as e:
             traceback.print_exc()
+        # F43 ZIP Check action
+        try:
+            self.actionF43ZipCheck.triggered.connect(self.show_f43zip)
+        except Exception:
+            traceback.print_exc()
         
         
         # Connect View menu actions
@@ -115,6 +120,11 @@ class Main(QMainWindow, Main_ui):
         """Handle 👤 ตรวจสอบสิทธิ (single) toolbar/menu action"""
         from PersonalCheck import PersonalCheck
         self.show_mdi_child(PersonalCheck, "👤 ตรวจสอบสิทธิ", parent=self)
+
+    def show_f43zip(self):
+        """Handle ตรวจสอบ43แฟ้ม (ZIP) menu action"""
+        from F43ZipCheck import F43ZipCheck
+        self.show_mdi_child(F43ZipCheck, "📦 ตรวจสอบ43แฟ้ม (ZIP)", parent=self)
 
     
 

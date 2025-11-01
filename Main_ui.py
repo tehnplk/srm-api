@@ -176,7 +176,13 @@ class Main_ui(object):
         self.menuEligibility.addAction(self.actionPatient)
         self.menuEligibility.addAction(self.actionPatientToday)
 
-        
+        # ตรวจสอบ43แฟ้มจาก ZIP action
+        self.actionF43ZipCheck = QAction(MainWindow)
+        self.actionF43ZipCheck.setObjectName("actionF43ZipCheck")
+        self.actionF43ZipCheck.setText("📦 ตรวจสอบ43แฟ้ม (ZIP)")
+        self.actionF43ZipCheck.setStatusTip("เลือกไฟล์ ZIP แล้วตรวจสอบแฟ้ม 43 ภายใน")
+        self.menuFile.addAction(self.actionF43ZipCheck)
+
 
         self.menuFile.addSeparator()
         # ตั้งค่า action
@@ -253,7 +259,8 @@ class Main_ui(object):
         # Expose submenu items as direct toolbar buttons
         self.toolBar.addAction(self.actionPatient)
         self.toolBar.addAction(self.actionPatientToday)
-        
+        # Add F43ZipCheck to toolbar
+        self.toolBar.addAction(self.actionF43ZipCheck)
 
         # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)
