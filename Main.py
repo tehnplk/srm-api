@@ -44,6 +44,11 @@ class Main(QMainWindow, Main_ui):
             self.actionEligibilitySingle.triggered.connect(self.show_personal_check)
         except Exception as e:
             traceback.print_exc()
+        # F43Check action
+        try:
+            self.actionF43Check.triggered.connect(self.show_f43check)
+        except Exception:
+            traceback.print_exc()
         
         # Connect View menu actions
         self.actionTileWindows.triggered.connect(self.tile_windows)
@@ -76,6 +81,16 @@ class Main(QMainWindow, Main_ui):
             child = child_class(*args, **kwargs)
             sub_window = self.centralwidget.addSubWindow(child)
             sub_window.setWindowTitle(title)
+            # Set icon for child subwindow from window.png
+            try:
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                child_icon_path = os.path.join(script_dir, "window.png")
+                if os.path.exists(child_icon_path):
+                    sub_window.setWindowIcon(QIcon(child_icon_path))
+                else:
+                    sub_window.setWindowIcon(QIcon())
+            except Exception:
+                pass
             sub_window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
             # Show new subwindow maximized inside MDI area
             sub_window.showMaximized()
@@ -104,6 +119,11 @@ class Main(QMainWindow, Main_ui):
         """Handle 👤 ตรวจสอบสิทธิ (single) toolbar/menu action"""
         from PersonalCheck import PersonalCheck
         self.show_mdi_child(PersonalCheck, "👤 ตรวจสอบสิทธิ", parent=self)
+
+    def show_f43check(self):
+        """Handle ตรวจสอบ43แฟ้ม menu action"""
+        from F43Check import F43Check
+        self.show_mdi_child(F43Check, "📁 ตรวจสอบ43แฟ้ม", parent=self)
 
     def show_check_update(self):
         """Check update from API, write new.txt if newer, and offer to download via Update.exe."""
@@ -280,5 +300,5 @@ if __name__ == "__main__":
         app.setWindowIcon(QIcon(icon_path))
     
     window = Main()
-    window.show()
+    window.showMaximized()
     sys.exit(app.exec())
