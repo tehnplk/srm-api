@@ -4,7 +4,7 @@ import os
 
 pid = "3650100813118"
 pid = "3650101207220"
-pid = "3660700517161"
+pid = "3650100810895"
 url = f"https://srm.nhso.go.th/api/ucws/v1/right-search?pid={pid}"
 
 # อ่าน token จากไฟล์
