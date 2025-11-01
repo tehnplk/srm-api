@@ -230,6 +230,12 @@ class Main_ui(object):
         self.actionCheckUpdate.setStatusTip("ตรวจสอบอัปเดตเวอร์ชันใหม่")
         self.menuHelp.addAction(self.actionCheckUpdate)
 
+        self.actionBackup = QAction(MainWindow)
+        self.actionBackup.setObjectName("actionBackup")
+        self.actionBackup.setText("🗄️ Backup HIS")
+        self.actionBackup.setStatusTip("สำรองข้อมูลฐานข้อมูล HIS (1 ตาราง 1 ไฟล์ .sql)")
+        self.menuHelp.addAction(self.actionBackup)
+
         # เกี่ยวกับ action
         self.actionAbout = QAction(MainWindow)
         self.actionAbout.setObjectName("actionAbout")
@@ -261,6 +267,8 @@ class Main_ui(object):
         self.toolBar.addAction(self.actionPatientToday)
         # Add F43ZipCheck to toolbar
         self.toolBar.addAction(self.actionF43ZipCheck)
+
+        self.toolBar.addAction(self.actionBackup)
 
         # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)

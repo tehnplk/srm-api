@@ -41,6 +41,10 @@ class Main(QMainWindow, Main_ui):
         self.actionCheckUpdate.triggered.connect(self.show_check_update)
         self.actionAbout.triggered.connect(self.show_about)
         try:
+            self.actionBackup.triggered.connect(self.show_backup)
+        except Exception as e:
+            traceback.print_exc()
+        try:
             self.actionEligibilitySingle.triggered.connect(self.show_personal_check)
         except Exception as e:
             traceback.print_exc()
@@ -127,6 +131,10 @@ class Main(QMainWindow, Main_ui):
         self.show_mdi_child(F43ZipCheck, "📦 ตรวจสอบ43แฟ้ม (ZIP)", parent=self)
 
     
+
+    def show_backup(self):
+        from Backup import Backup
+        self.show_mdi_child(Backup, "🗄️ Backup HIS", parent=self)
 
     def show_check_update(self):
         """Check update from API, write new.txt if newer, and offer to download via Update.exe."""
