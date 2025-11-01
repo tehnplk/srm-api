@@ -45,6 +45,10 @@ class Main(QMainWindow, Main_ui):
         except Exception as e:
             traceback.print_exc()
         try:
+            self.actionRestore.triggered.connect(self.show_restore)
+        except Exception:
+            traceback.print_exc()
+        try:
             self.actionEligibilitySingle.triggered.connect(self.show_personal_check)
         except Exception as e:
             traceback.print_exc()
@@ -135,6 +139,10 @@ class Main(QMainWindow, Main_ui):
     def show_backup(self):
         from Backup import Backup
         self.show_mdi_child(Backup, "🗄️ Backup HIS", parent=self)
+
+    def show_restore(self):
+        from Restore import Restore
+        self.show_mdi_child(Restore, "🧩 Restore HIS", parent=self)
 
     def show_check_update(self):
         """Check update from API, write new.txt if newer, and offer to download via Update.exe."""

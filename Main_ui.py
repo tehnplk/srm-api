@@ -236,6 +236,12 @@ class Main_ui(object):
         self.actionBackup.setStatusTip("สำรองข้อมูลฐานข้อมูล HIS (1 ตาราง 1 ไฟล์ .sql)")
         self.menuHelp.addAction(self.actionBackup)
 
+        self.actionRestore = QAction(MainWindow)
+        self.actionRestore.setObjectName("actionRestore")
+        self.actionRestore.setText("🧩 Restore HIS")
+        self.actionRestore.setStatusTip("นำเข้าข้อมูลจากไฟล์สำรอง ZIP (.sql)")
+        self.menuHelp.addAction(self.actionRestore)
+
         # เกี่ยวกับ action
         self.actionAbout = QAction(MainWindow)
         self.actionAbout.setObjectName("actionAbout")
@@ -269,6 +275,7 @@ class Main_ui(object):
         self.toolBar.addAction(self.actionF43ZipCheck)
 
         self.toolBar.addAction(self.actionBackup)
+        self.toolBar.addAction(self.actionRestore)
 
         # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)
