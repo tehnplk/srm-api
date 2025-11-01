@@ -7,3 +7,5 @@ trigger: always_on
 - When need to implement style you should to implement style in _ui file.
 - UI file should design in light theme and look modernize.
 - Long task should implement by Qthread.
+- A child form can be opened from both the Menu and the Toolbar.
+- When a module is removed, its menu should also be removed.
