@@ -10,6 +10,7 @@ from PyQt6.QtGui import QIcon
 
 # Import local modules
 from Main_ui import Main_ui
+from Login import Login
 
 
 class Main(QMainWindow, Main_ui):
@@ -35,6 +36,7 @@ class Main(QMainWindow, Main_ui):
             traceback.print_exc()
 
         # Connect actions
+        self.actionLogin.triggered.connect(self.show_login)
         self.actionPatient.triggered.connect(self.show_patient)
         self.actionPatientToday.triggered.connect(self.show_patient_today)
         self.actionSetting.triggered.connect(self.show_setting)
@@ -55,6 +57,12 @@ class Main(QMainWindow, Main_ui):
         # F43 ZIP Check action
         try:
             self.actionF43ZipCheck.triggered.connect(self.show_f43zip)
+        except Exception:
+            traceback.print_exc()
+        
+        # Export16Files action
+        try:
+            self.actionExport16Files.triggered.connect(self.show_export16files)
         except Exception:
             traceback.print_exc()
         
@@ -124,6 +132,10 @@ class Main(QMainWindow, Main_ui):
         from Setting import Setting
         self.show_mdi_child(Setting, "⚙️ ตั้งค่า", parent=self)
 
+    def show_login(self):
+        """Handle 🔐 เข้าสู่ระบบ menu action"""
+        self.show_mdi_child(Login, "🔐 เข้าสู่ระบบ", parent=self)
+
     def show_personal_check(self):
         """Handle 👤 ตรวจสอบสิทธิ (single) toolbar/menu action"""
         from PersonalCheck import PersonalCheck
@@ -133,6 +145,11 @@ class Main(QMainWindow, Main_ui):
         """Handle ตรวจสอบ43แฟ้ม (ZIP) menu action"""
         from F43ZipCheck import F43ZipCheck
         self.show_mdi_child(F43ZipCheck, "📦 ตรวจสอบ43แฟ้ม (ZIP)", parent=self)
+
+    def show_export16files(self):
+        """Handle ส่งออก 16 แฟ้ม menu action"""
+        from Export16Files import Export16Files
+        self.show_mdi_child(Export16Files, "📤 ส่งออก 16 แฟ้ม", parent=self)
 
     
 

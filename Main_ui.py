@@ -147,6 +147,15 @@ class Main_ui(object):
         self.menuFile.setTitle("File")
         MainWindow.menuBar().addAction(self.menuFile.menuAction())
 
+        # Login action
+        self.actionLogin = QAction(MainWindow)
+        self.actionLogin.setObjectName("actionLogin")
+        self.actionLogin.setText("🔐 เข้าสู่ระบบ")
+        self.actionLogin.setStatusTip("เข้าสู่ระบบ SRM API")
+        self.menuFile.addAction(self.actionLogin)
+
+        self.menuFile.addSeparator()
+
         # ผู้ป่วย (Patient) action
         self.actionPatient = QAction(MainWindow)
         self.actionPatient.setObjectName("actionPatient")
@@ -182,6 +191,13 @@ class Main_ui(object):
         self.actionF43ZipCheck.setText("📦 ตรวจสอบ43แฟ้ม (ZIP)")
         self.actionF43ZipCheck.setStatusTip("เลือกไฟล์ ZIP แล้วตรวจสอบแฟ้ม 43 ภายใน")
         self.menuFile.addAction(self.actionF43ZipCheck)
+
+        # ส่งออก16แฟ้ม action
+        self.actionExport16Files = QAction(MainWindow)
+        self.actionExport16Files.setObjectName("actionExport16Files")
+        self.actionExport16Files.setText("📤 ส่งออก 16 แฟ้ม")
+        self.actionExport16Files.setStatusTip("ส่งออกข้อมูล 16 แฟ้ม")
+        self.menuFile.addAction(self.actionExport16Files)
 
 
         self.menuFile.addSeparator()

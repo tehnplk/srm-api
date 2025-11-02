@@ -1,0 +1,3 @@
+import base64
+svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><polyline points='3,9 6.5,12.5 13,4.5' fill='none' stroke='#27ae60' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>"
+print(base64.b64encode(svg.encode('utf-8')).decode('ascii'))

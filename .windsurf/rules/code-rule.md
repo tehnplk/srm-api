@@ -14,3 +14,4 @@ tools to resolve library id and get library docs without me having to explicitly
 - When a module is removed, its menu should also be removed.
 - Do not use nested or unnecessary try-except blocks.
 - Always print the error message to the console in each try-except block.
+- when finnish build module . Explain it into modules.md
