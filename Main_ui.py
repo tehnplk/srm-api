@@ -185,19 +185,6 @@ class Main_ui(object):
         self.menuEligibility.addAction(self.actionPatient)
         self.menuEligibility.addAction(self.actionPatientToday)
 
-        # ตรวจสอบ43แฟ้มจาก ZIP action
-        self.actionF43ZipCheck = QAction(MainWindow)
-        self.actionF43ZipCheck.setObjectName("actionF43ZipCheck")
-        self.actionF43ZipCheck.setText("📦 ตรวจสอบ43แฟ้ม (ZIP)")
-        self.actionF43ZipCheck.setStatusTip("เลือกไฟล์ ZIP แล้วตรวจสอบแฟ้ม 43 ภายใน")
-        self.menuFile.addAction(self.actionF43ZipCheck)
-
-        # ส่งออก16แฟ้ม action
-        self.actionExport16Files = QAction(MainWindow)
-        self.actionExport16Files.setObjectName("actionExport16Files")
-        self.actionExport16Files.setText("📤 ส่งออก 16 แฟ้ม")
-        self.actionExport16Files.setStatusTip("ส่งออกข้อมูล 16 แฟ้ม")
-        self.menuFile.addAction(self.actionExport16Files)
 
 
         self.menuFile.addSeparator()
@@ -246,17 +233,6 @@ class Main_ui(object):
         self.actionCheckUpdate.setStatusTip("ตรวจสอบอัปเดตเวอร์ชันใหม่")
         self.menuHelp.addAction(self.actionCheckUpdate)
 
-        self.actionBackup = QAction(MainWindow)
-        self.actionBackup.setObjectName("actionBackup")
-        self.actionBackup.setText("🗄️ Backup HIS")
-        self.actionBackup.setStatusTip("สำรองข้อมูลฐานข้อมูล HIS (1 ตาราง 1 ไฟล์ .sql)")
-        self.menuHelp.addAction(self.actionBackup)
-
-        self.actionRestore = QAction(MainWindow)
-        self.actionRestore.setObjectName("actionRestore")
-        self.actionRestore.setText("🧩 Restore HIS")
-        self.actionRestore.setStatusTip("นำเข้าข้อมูลจากไฟล์สำรอง ZIP (.sql)")
-        self.menuHelp.addAction(self.actionRestore)
 
         # เกี่ยวกับ action
         self.actionAbout = QAction(MainWindow)
@@ -287,11 +263,7 @@ class Main_ui(object):
         # Expose submenu items as direct toolbar buttons
         self.toolBar.addAction(self.actionPatient)
         self.toolBar.addAction(self.actionPatientToday)
-        # Add F43ZipCheck to toolbar
-        self.toolBar.addAction(self.actionF43ZipCheck)
 
-        self.toolBar.addAction(self.actionBackup)
-        self.toolBar.addAction(self.actionRestore)
 
         # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)

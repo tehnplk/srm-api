@@ -67,7 +67,7 @@ class PersonalCheck_ui(object):
                 dash.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.cid_layout.addWidget(dash)
         # Build input group box
-        self.group_input = QGroupBox("กรอกเลขบัตรประชาชน")
+        self.group_input = QGroupBox("เลขบัตรประชาชน")
         self.group_input_layout = QVBoxLayout(self.group_input)
         self.group_input_layout.setContentsMargins(12, 12, 12, 12)
         self.group_input_layout.setSpacing(8)
@@ -193,6 +193,51 @@ class PersonalCheck_ui(object):
         # Row 5: เลขที่สิทธิ (full width value)
         self.result_grid.addWidget(title("เลขที่สิทธิ"), 5, 0)
         self.result_grid.addWidget(self.value_right_no, 5, 1, 1, 5)
+
+        # Row 6: Buttons at bottom right
+        self.btn_refresh_token = QPushButton("🔄 Refresh Token", PersonalCheck_ui)
+        try:
+            self.btn_refresh_token.setStyleSheet("""
+                QPushButton {
+                    background-color: #17a2b8;
+                    color: #ffffff;
+                    border: 1px solid #17a2b8;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+                QPushButton:hover { background-color: #138496; }
+                QPushButton:pressed { background-color: #117a8b; }
+                QPushButton:disabled { background-color: #6c757d; border-color: #6c757d; }
+            """)
+        except Exception as e:
+            traceback.print_exc()
+        self.btn_refresh_token.setMinimumWidth(120)
+        # Add refresh token button to bottom right (column 4, row 6)
+        self.result_grid.addWidget(self.btn_refresh_token, 6, 4, Qt.AlignmentFlag.AlignRight)
+        
+        self.btn_update_his = QPushButton("✅ อัพเดทสิทธิใน HIS", PersonalCheck_ui)
+        try:
+            self.btn_update_his.setStyleSheet("""
+                QPushButton {
+                    background-color: #28a745;
+                    color: #ffffff;
+                    border: 1px solid #28a745;
+                    border-radius: 8px;
+                    padding: 8px 16px;
+                    font-weight: 600;
+                    font-size: 13px;
+                }
+                QPushButton:hover { background-color: #218838; }
+                QPushButton:pressed { background-color: #1e7e34; }
+                QPushButton:disabled { background-color: #6c757d; border-color: #6c757d; }
+            """)
+        except Exception as e:
+            traceback.print_exc()
+        self.btn_update_his.setMinimumWidth(140)
+        # Add button to bottom right (column 5, row 6)
+        self.result_grid.addWidget(self.btn_update_his, 6, 5, Qt.AlignmentFlag.AlignRight)
 
         # Build result group box
         self.group_result = QGroupBox("ผลการตรวจสอบสิทธิ")
