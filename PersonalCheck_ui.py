@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QSplitter,
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QFont
 from PyQt6.QtCore import Qt
 
 

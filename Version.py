@@ -1,5 +1,5 @@
-CODE = "2"
-NAME = "1.0.1"
-RELEASE = "2025-11-01"
+CODE = "3"
+NAME = "1.0.2"
+RELEASE = "2025-11-05"
 
 __all__ = ["CODE", "NAME", "RELEASE"]

@@ -577,7 +577,11 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                             new_no or None,
                             cid,
                         ]
+                        print(f"[SQL UPDATE PERSON] {sql_person}")
+                        print(f"[SQL PARAMS] {params_person}")
                         cur.execute(sql_person, params_person)
+                        affected_rows = cur.rowcount
+                        print(f"[AFFECTED ROWS] Person table: {affected_rows} rows")
                         
                         # Update patient table
                         sql_patient = (
@@ -594,7 +598,11 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                             hospsub_hcode or None,
                             cid,
                         ]
+                        print(f"[SQL UPDATE PATIENT] {sql_patient}")
+                        print(f"[SQL PARAMS] {params_patient}")
                         cur.execute(sql_patient, params_patient)
+                        affected_rows = cur.rowcount
+                        print(f"[AFFECTED ROWS] Patient table: {affected_rows} rows")
                         
                         # Update today's ovst
                         sql_ovst = (
@@ -610,7 +618,11 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                             hospsub_hcode or None,
                             cid,
                         ]
+                        print(f"[SQL UPDATE OVST] {sql_ovst}")
+                        print(f"[SQL PARAMS] {params_ovst}")
                         cur.execute(sql_ovst, params_ovst)
+                        affected_rows = cur.rowcount
+                        print(f"[AFFECTED ROWS] OVST table: {affected_rows} rows")
                         
                     elif system == 'jhcis':
                         # Update person rights (JHCIS)
@@ -632,7 +644,11 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                             sets.append("dateupdate=NOW()")
                             params.append(cid)
                             sql = "UPDATE person SET " + ", ".join(sets) + " WHERE idcard=%s"
+                            print(f"[SQL UPDATE PERSON JHCIS] {sql}")
+                            print(f"[SQL PARAMS] {params}")
                             cur.execute(sql, params)
+                            affected_rows = cur.rowcount
+                            print(f"[AFFECTED ROWS] Person table (JHCIS): {affected_rows} rows")
                             
                         # Update today's visit by pid (JHCIS)
                         try:
@@ -655,7 +671,11 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
                                     sub_inscl_name or None,
                                     pid_val,
                                 ]
+                                print(f"[SQL UPDATE VISIT JHCIS] {sql_visit}")
+                                print(f"[SQL PARAMS] {params_visit}")
                                 cur.execute(sql_visit, params_visit)
+                                affected_rows = cur.rowcount
+                                print(f"[AFFECTED ROWS] Visit table (JHCIS): {affected_rows} rows")
                         except Exception:
                             pass
                             
