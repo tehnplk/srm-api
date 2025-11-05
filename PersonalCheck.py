@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, QEvent, QSettings
 from PyQt6.QtGui import QIntValidator, QGuiApplication, QKeySequence
 
 from PersonalCheck_ui import PersonalCheck_ui
-from srm import read_token, call_right_search, refresh_token
+from srm import read_token, call_right_search, refresh_token, open_srm_program
 from QtSmartCard import SmartCardObserver
 
 class PersonalCheck(QWidget, PersonalCheck_ui):
@@ -446,7 +446,14 @@ class PersonalCheck(QWidget, PersonalCheck_ui):
             QMessageBox.information(self, 'สำเร็จ', 'รีเฟรชโทเคนเรียบร้อยแล้ว')
             self._log("[SUCCESS] รีเฟรชโทเคนเรียบร้อย")
         except Exception as e:
-            QMessageBox.warning(self, 'ล้มเหลว', f'การขอ token ใหม่เกิดข้อผิดพลาด:\n{e}')
+            # Try to open SRM program
+            try:
+                if open_srm_program():
+                    QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ\n\nโปรแกรม SRM ถูกเปิดขึ้นมาแล้ว')
+                else:
+                    QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
+            except Exception:
+                QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
             self._log(f"[ERROR] รีเฟรชโทเคนล้มเหลว: {e}")
 
     def on_update_his(self):

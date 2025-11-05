@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QDateEdit,
     QApplication,
     QPushButton,
+    QCheckBox,
 )
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QFont
@@ -87,6 +88,10 @@ class PatientToday_ui(object):
         self.stop_rights_button.setMinimumWidth(180)
         self.stop_rights_button.setFont(QFont("Segoe UI", 11))
         self.top_bar.addWidget(self.stop_rights_button)
+
+        self.auto_update_checkbox = QCheckBox("Update สิทธิลงทะเบียนผู้ป่วยใน HIS แบบอัตโนมัติ", PatientToday_ui)
+        self.auto_update_checkbox.setFont(QFont("Segoe UI", 11))
+        self.top_bar.addWidget(self.auto_update_checkbox)
 
         self.top_bar.addStretch(1)
         self.main_layout.addLayout(self.top_bar)

@@ -11,6 +11,7 @@ from srm import (
     was_checked_today,
     is_patient_dead,
     refresh_token,
+    open_srm_program,
 )
 
 from PatientToday_ui import PatientToday_ui
@@ -113,7 +114,8 @@ class PatientToday(QWidget, PatientToday_ui):
                     p.fname,
                     p.lname,
                     COALESCE(o.pttype, p.pttype) AS pttype,
-                    COALESCE(o.pttypeno, p.pttype_no) AS pttype_no
+                    COALESCE(o.pttypeno, p.pttype_no) AS pttype_no,
+                    COALESCE(o.last_update, p.last_update) AS last_update_right
                 FROM ovst o
                 JOIN patient p ON p.hn = o.hn
                 WHERE DATE(o.vstdate) = %s
@@ -131,7 +133,8 @@ class PatientToday(QWidget, PatientToday_ui):
                     p.fname AS fname,
                     p.lname AS lname,
                     COALESCE(v.rightcode, p.rightcode) AS pttype,
-                    COALESCE(v.rightno, p.rightno) AS pttype_no
+                    COALESCE(v.rightno, p.rightno) AS pttype_no,
+                    COALESCE(v.dateupdate, p.dateupdate) AS last_update_right
                 FROM visit v
                 JOIN person p ON p.pid = v.pid
                 LEFT JOIN ctitle t ON p.prename = t.titlecode
@@ -142,7 +145,7 @@ class PatientToday(QWidget, PatientToday_ui):
             params = (date_str,)
 
         rows = []
-        headers = ["cid", "pname", "fname", "lname", "pttype", "pttype_no"]
+        headers = ["cid", "pname", "fname", "lname", "pttype", "pttype_no", "last_update_right"]
         conn = pymysql.connect(**cfg)
         try:
             with conn.cursor() as cur:
@@ -198,7 +201,14 @@ class PatientToday(QWidget, PatientToday_ui):
             refresh_token()
             QMessageBox.information(self, 'สำเร็จ', 'รีเฟรชโทเคนเรียบร้อยแล้ว')
         except Exception as e:
-            QMessageBox.warning(self, 'ล้มเหลว', f'การขอ token ใหม่เกิดข้อผิดพลาด:\n{e}')
+            # Try to open SRM program
+            try:
+                if open_srm_program():
+                    QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ\n\nโปรแกรม SRM ถูกเปิดขึ้นมาแล้ว')
+                else:
+                    QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
+            except Exception:
+                QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
 
     def _set_checking_state(self, running: bool):
         self._is_checking = bool(running)
@@ -288,6 +298,7 @@ class PatientToday(QWidget, PatientToday_ui):
         cfg = self._get_db_config()
         system = self._get_system()
         date_str = self.date_edit.date().toString('yyyy-MM-dd')
+        auto_update = getattr(self, 'auto_update_checkbox', None) and self.auto_update_checkbox.isChecked()
 
         class RightsWorker(QObject):
             progress_row = pyqtSignal(int)
@@ -295,13 +306,14 @@ class PatientToday(QWidget, PatientToday_ui):
             finished_summary = pyqtSignal(int, int, int, int, bool)
             need_resume_from = pyqtSignal(int)
             update_rights = pyqtSignal(int, str, str, str)
-            def __init__(self, system: str, date_str: str, debug: bool = False, force: bool = False):
+            def __init__(self, system: str, date_str: str, debug: bool = False, force: bool = False, auto_update: bool = False):
                 super().__init__()
                 self._stop = False
                 self._debug = bool(debug)
                 self._force_recheck = bool(force)
                 self._system = (system or '').lower()
                 self._date = date_str
+                self._auto_update = bool(auto_update)
             def request_stop(self):
                 self._stop = True
             def _checked_on_date(self, conn, cid: str) -> bool:
@@ -422,41 +434,69 @@ class PatientToday(QWidget, PatientToday_ui):
                             # persist back
                             try:
                                 with db_conn.cursor() as c_upd:
-                                    if self._system == 'hosxp':
-                                        c_upd.execute(
-                                            "UPDATE person SET pttype=%s, pttype_begin_date=DATE(%s), pttype_expire_date=DATE(%s), pttype_hospmain=%s, pttype_hospsub=%s, pttype_no=%s, last_update_pttype=NOW() WHERE cid=%s",
-                                            [new_type or None, begin_date or None, expire_date or None, hospmain_hcode or None, hospsub_hcode or None, new_no or None, cid]
-                                        )
-                                        c_upd.execute(
-                                            "UPDATE patient SET pttype=%s, pttype_no=%s, pttype_hospmain=%s, pttype_hospsub=%s, last_update=NOW() WHERE cid=%s",
-                                            [new_type or None, new_no or None, hospmain_hcode or None, hospsub_hcode or None, cid]
-                                        )
-                                        c_upd.execute(
-                                            "UPDATE ovst o JOIN patient p ON p.hn = o.hn SET o.pttype=%s, o.pttypeno=%s, o.hospmain=%s, o.hospsub=%s WHERE DATE(o.vstdate)=%s AND p.cid=%s",
-                                            [new_type or None, new_no or None, hospmain_hcode or None, hospsub_hcode or None, self._date, cid]
-                                        )
-                                    else:
-                                        sets = []; params = []
-                                        if new_type: sets.append("rightcode=%s"); params.append(new_type)
-                                        if new_no: sets.append("rightno=%s"); params.append(new_no)
-                                        if hospmain_hcode is not None: sets.append("hosmain=%s"); params.append(hospmain_hcode)
-                                        if hospsub_hcode is not None: sets.append("hossub=%s"); params.append(hospsub_hcode)
-                                        if begin_date: sets.append("datestart=DATE(%s)"); params.append(begin_date)
-                                        if expire_date: sets.append("dateexpire=DATE(%s)"); params.append(expire_date)
-                                        if sets:
-                                            sets.append("dateupdate=NOW()"); params.append(cid)
-                                            c_upd.execute("UPDATE person SET " + ", ".join(sets) + " WHERE idcard=%s", params)
-                                        # selected date's visit
-                                        pid_val = None
-                                        c_upd.execute("SELECT pid FROM person WHERE idcard=%s LIMIT 1", (cid,))
-                                        rpid = c_upd.fetchone()
-                                        if rpid and len(rpid) > 0:
-                                            pid_val = rpid[0]
-                                        if pid_val is not None:
-                                            c_upd.execute(
-                                                "UPDATE visit SET rightcode=%s, rightno=%s, hosmain=%s, hossub=%s, main_inscl=%s, sub_inscl=%s, dateupdate=NOW() WHERE pid=%s AND visitdate=%s",
-                                                [new_type or None, new_no or None, hospmain_hcode or None, hospsub_hcode or None, main_inscl_name or None, sub_inscl_name or None, pid_val, self._date]
+                                    if self._auto_update:
+                                        if self._system == 'hosxp':
+                                            sql_person = (
+                                                "UPDATE person SET pttype=%s, pttype_begin_date=DATE(%s), pttype_expire_date=DATE(%s), pttype_hospmain=%s, pttype_hospsub=%s, pttype_no=%s, last_update_pttype=NOW() WHERE cid=%s"
                                             )
+                                            params_person = [new_type or None, begin_date or None, expire_date or None, hospmain_hcode or None, hospsub_hcode or None, new_no or None, cid]
+                                            print(f"[SQL UPDATE PERSON] {sql_person}")
+                                            print(f"[SQL PARAMS] {params_person}")
+                                            c_upd.execute(sql_person, params_person)
+                                            affected_rows = c_upd.rowcount
+                                            print(f"[AFFECTED ROWS] Person table: {affected_rows} rows")
+                                            
+                                            sql_patient = (
+                                                "UPDATE patient SET pttype=%s, pttype_no=%s, pttype_hospmain=%s, pttype_hospsub=%s, last_update=NOW() WHERE cid=%s"
+                                            )
+                                            params_patient = [new_type or None, new_no or None, hospmain_hcode or None, hospsub_hcode or None, cid]
+                                            print(f"[SQL UPDATE PATIENT] {sql_patient}")
+                                            print(f"[SQL PARAMS] {params_patient}")
+                                            c_upd.execute(sql_patient, params_patient)
+                                            affected_rows = c_upd.rowcount
+                                            print(f"[AFFECTED ROWS] Patient table: {affected_rows} rows")
+                                            
+                                            sql_ovst = (
+                                                "UPDATE ovst o JOIN patient p ON p.hn = o.hn SET o.pttype=%s, o.pttypeno=%s, o.hospmain=%s, o.hospsub=%s WHERE DATE(o.vstdate)=%s AND p.cid=%s"
+                                            )
+                                            params_ovst = [new_type or None, new_no or None, hospmain_hcode or None, hospsub_hcode or None, self._date, cid]
+                                            print(f"[SQL UPDATE OVST] {sql_ovst}")
+                                            print(f"[SQL PARAMS] {params_ovst}")
+                                            c_upd.execute(sql_ovst, params_ovst)
+                                            affected_rows = c_upd.rowcount
+                                            print(f"[AFFECTED ROWS] OVST table: {affected_rows} rows")
+                                        else:
+                                            sets = []; params = []
+                                            if new_type: sets.append("rightcode=%s"); params.append(new_type)
+                                            if new_no: sets.append("rightno=%s"); params.append(new_no)
+                                            if hospmain_hcode is not None: sets.append("hosmain=%s"); params.append(hospmain_hcode)
+                                            if hospsub_hcode is not None: sets.append("hossub=%s"); params.append(hospsub_hcode)
+                                            if begin_date: sets.append("datestart=DATE(%s)"); params.append(begin_date)
+                                            if expire_date: sets.append("dateexpire=DATE(%s)"); params.append(expire_date)
+                                            if sets:
+                                                sets.append("dateupdate=NOW()"); params.append(cid)
+                                                sql_person = "UPDATE person SET " + ", ".join(sets) + " WHERE idcard=%s"
+                                                print(f"[SQL UPDATE PERSON JHCIS] {sql_person}")
+                                                print(f"[SQL PARAMS] {params}")
+                                                c_upd.execute(sql_person, params)
+                                                affected_rows = c_upd.rowcount
+                                                print(f"[AFFECTED ROWS] Person table (JHCIS): {affected_rows} rows")
+                                            # selected date's visit
+                                            pid_val = None
+                                            c_upd.execute("SELECT pid FROM person WHERE idcard=%s LIMIT 1", (cid,))
+                                            rpid = c_upd.fetchone()
+                                            if rpid and len(rpid) > 0:
+                                                pid_val = rpid[0]
+                                            if pid_val is not None:
+                                                sql_visit = (
+                                                    "UPDATE visit SET rightcode=%s, rightno=%s, hosmain=%s, hossub=%s, main_inscl=%s, sub_inscl=%s, dateupdate=NOW() WHERE pid=%s AND visitdate=%s"
+                                                )
+                                                params_visit = [new_type or None, new_no or None, hospmain_hcode or None, hospsub_hcode or None, main_inscl_name or None, sub_inscl_name or None, pid_val, self._date]
+                                                print(f"[SQL UPDATE VISIT JHCIS] {sql_visit}")
+                                                print(f"[SQL PARAMS] {params_visit}")
+                                                c_upd.execute(sql_visit, params_visit)
+                                                affected_rows = c_upd.rowcount
+                                                print(f"[AFFECTED ROWS] Visit table (JHCIS): {affected_rows} rows")
                                 db_conn.commit()
                             except Exception:
                                 traceback.print_exc()
@@ -485,7 +525,7 @@ class PatientToday(QWidget, PatientToday_ui):
         self._pending_force = bool(force)
 
         self._thread = QThread(self)
-        self._worker = RightsWorker(system=system, date_str=date_str, debug=debug, force=force)
+        self._worker = RightsWorker(system=system, date_str=date_str, debug=debug, force=force, auto_update=auto_update)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
 
@@ -548,6 +588,14 @@ class PatientToday(QWidget, PatientToday_ui):
                             self._show_status(f"การขอ token ใหม่เกิดข้อผิดพลาด: {ex}", 7000)
                         except Exception:
                             pass
+                        # Try to open SRM program
+                        try:
+                            if open_srm_program():
+                                QMessageBox.warning(self, 'ล้มเหลว', f'{ex}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ\n\nโปรแกรม SRM ถูกเปิดขึ้นมาแล้ว')
+                            else:
+                                QMessageBox.warning(self, 'ล้มเหลว', f'{ex}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
+                        except Exception:
+                            QMessageBox.warning(self, 'ล้มเหลว', f'{ex}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
                     else:
                         QTimer.singleShot(5000, lambda: self._start_rights_worker(
                             getattr(self, '_pending_rows', []),

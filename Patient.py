@@ -1,11 +1,11 @@
 import sys
 from typing import List, Any
 import traceback
+from datetime import datetime
 
 from PyQt6.QtWidgets import QWidget, QApplication, QMessageBox, QInputDialog, QMenu, QAbstractItemView, QProgressDialog
 from PyQt6.QtCore import QSettings, Qt, QSortFilterProxyModel, QRegularExpression, QObject, pyqtSignal, QThread, QCoreApplication, QTimer
 from PyQt6.QtGui import QGuiApplication
-from datetime import datetime
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 from Patient_ui import Patient_ui
@@ -18,6 +18,7 @@ from srm import (
     update_patient_death,
     call_right_search,
     refresh_token,
+    open_srm_program,
     _has_hosxp_death_flag,
 )
 
@@ -119,7 +120,8 @@ class Patient(QWidget, Patient_ui):
                             p.fname           AS fname,
                             p.lname           AS lname,
                             p.rightcode       AS pttype,
-                            p.rightno         AS pttype_no
+                            p.rightno         AS pttype_no,
+                            p.dateupdate      AS last_update_right
                         FROM person p
                         LEFT JOIN ctitle t ON p.prename = t.titlecode
                         WHERE CHAR_LENGTH(p.idcard) = 13 
@@ -146,7 +148,7 @@ class Patient(QWidget, Patient_ui):
                         placeholders = ",".join(["%s"] * len(dead_cids))
                         sql = (
                             """
-                            SELECT cid, pname, fname, lname, pttype, pttype_no
+                            SELECT cid, pname, fname, lname, pttype, pttype_no, last_update
                             FROM patient
                             WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
                               AND cid NOT IN (""" + placeholders + ")"
@@ -155,7 +157,7 @@ class Patient(QWidget, Patient_ui):
                     else:
                         cur.execute(
                             """
-                            SELECT cid, pname, fname, lname, pttype, pttype_no
+                            SELECT cid, pname, fname, lname, pttype, pttype_no, last_update
                             FROM patient
                             WHERE CHAR_LENGTH(cid) = 13 AND cid REGEXP '^[0-9]{13}$'
                             """
@@ -174,6 +176,10 @@ class Patient(QWidget, Patient_ui):
     def _populate_table(self, headers: List[str], rows: List[tuple]):
         # Prepend a 'check' column
         headers_with_check = ["check"] + headers + ["pttype_new", "pttype_no_new"]
+        # Rename last_update to last_update_right for consistency if needed
+        if "last_update" in headers_with_check:
+            idx = headers_with_check.index("last_update")
+            headers_with_check[idx] = "last_update_right"
         # Remember cid column index for context menu copy
         try:
             self.cid_col = headers_with_check.index("cid")
@@ -307,7 +313,18 @@ class Patient(QWidget, Patient_ui):
             new_tok = refresh_token()
             QMessageBox.information(self, 'สำเร็จ', 'รีเฟรชโทเคนเรียบร้อยแล้ว')
         except Exception as e:
-            QMessageBox.warning(self, 'ล้มเหลว', f'การขอ token ใหม่เกิดข้อผิดพลาด:\n{e}')
+            try:
+                print(e)
+            except Exception:
+                pass
+            # Try to open SRM program
+            try:
+                if open_srm_program():
+                    QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ\n\nโปรแกรม SRM ถูกเปิดขึ้นมาแล้ว')
+                else:
+                    QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
+            except Exception:
+                QMessageBox.warning(self, 'ล้มเหลว', f'{e}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
 
     def _start_rights_worker(self, rows: List[tuple], debug: bool = False, force: bool = False):
         import pymysql
@@ -332,6 +349,7 @@ class Patient(QWidget, Patient_ui):
             return
         cfg = self._get_db_config()
         system = str(self.settings.value("system", "jhcis")).strip().lower()
+        auto_update = getattr(self, 'auto_update_checkbox', None) and self.auto_update_checkbox.isChecked()
 
         class RightsWorker(QObject):
             progress_row = pyqtSignal(int)
@@ -339,7 +357,7 @@ class Patient(QWidget, Patient_ui):
             finished_summary = pyqtSignal(int, int, int, int, bool)  # skipped_today, skipped_dead, succeeded, failed, token_expired
             need_resume_from = pyqtSignal(int)  # row index to resume from when token expired
             update_rights = pyqtSignal(int, str, str, str)  # proxy_row, cid, pttype_new, pttype_no_new
-            def __init__(self, system: str, patient_instance, debug: bool = False, force: bool = False):
+            def __init__(self, system: str, patient_instance, debug: bool = False, force: bool = False, auto_update: bool = False):
                 super().__init__()
                 self._stop = False
                 self._debug = bool(debug)
@@ -347,6 +365,7 @@ class Patient(QWidget, Patient_ui):
                 self._alerted_once = False
                 self._system = (system or "").lower()
                 self._patient = patient_instance
+                self._auto_update = bool(auto_update)
             def request_stop(self):
                 self._stop = True
 
@@ -530,117 +549,138 @@ class Patient(QWidget, Patient_ui):
                             try:
                                 if (new_type or new_no):
                                     with db_conn.cursor() as c_upd:
-                                        if self._system == 'hosxp':
-                                            # 1) Update person with full fields and DATE() casts for date-only columns
-                                            sql_person = (
-                                                "UPDATE person SET "
-                                                "pttype=%s, "
-                                                "pttype_begin_date=DATE(%s), "
-                                                "pttype_expire_date=DATE(%s), "
-                                                "pttype_hospmain=%s, "
-                                                "pttype_hospsub=%s, "
-                                                "pttype_no=%s, "
-                                                "last_update_pttype=NOW() "
-                                                "WHERE cid=%s"
-                                            )
-                                            params_person = [
-                                                new_type or None,
-                                                begin_date or None,
-                                                expire_date or None,
-                                                (hospmain_hcode or None),
-                                                (hospsub_hcode or None),
-                                                new_no or None,
-                                                cid,
-                                            ]
-                                            c_upd.execute(sql_person, params_person)
-                                            db_conn.commit()
-
-                                            # 2) Update patient (only existing columns) and bump last_update
-                                            sql_patient = (
-                                                "UPDATE patient SET "
-                                                "pttype=%s, pttype_no=%s, "
-                                                "pttype_hospmain=%s, pttype_hospsub=%s, "
-                                                "last_update=NOW() "
-                                                "WHERE cid=%s"
-                                            )
-                                            params_patient = [
-                                                new_type or None,
-                                                new_no or None,
-                                                (hospmain_hcode or None),
-                                                (hospsub_hcode or None),
-                                                cid,
-                                            ]
-                                            c_upd.execute(sql_patient, params_patient)
-                                            db_conn.commit()
-
-                                            # 3) Update today's ovst joined by patient.cid
-                                            sql_ovst = (
-                                                "UPDATE ovst o "
-                                                "JOIN patient p ON p.hn = o.hn "
-                                                "SET o.pttype=%s, o.pttypeno=%s, o.hospmain=%s, o.hospsub=%s "
-                                                "WHERE DATE(o.vstdate)=CURDATE() AND p.cid=%s"
-                                            )
-                                            params_ovst = [
-                                                new_type or None,
-                                                new_no or None,
-                                                (hospmain_hcode or None),
-                                                (hospsub_hcode or None),
-                                                cid,
-                                            ]
-                                            c_upd.execute(sql_ovst, params_ovst)
-                                            db_conn.commit()
-                                        elif self._system == 'jhcis':
-                                            # Update person rights (JHCIS)
-                                            sets = []
-                                            params = []
-                                            if new_type:
-                                                sets.append("rightcode=%s"); params.append(new_type)
-                                            if new_no:
-                                                sets.append("rightno=%s"); params.append(new_no)
-                                            if hospmain_hcode is not None:
-                                                sets.append("hosmain=%s"); params.append(hospmain_hcode)
-                                            if hospsub_hcode is not None:
-                                                sets.append("hossub=%s"); params.append(hospsub_hcode)
-                                            if begin_date:
-                                                sets.append("datestart=DATE(%s)"); params.append(begin_date)
-                                            if expire_date:
-                                                sets.append("dateexpire=DATE(%s)"); params.append(expire_date)
-                                            if sets:
-                                                sets.append("dateupdate=NOW()")
-                                                params.append(cid)
-                                                sql = "UPDATE person SET " + ", ".join(sets) + " WHERE idcard=%s"
-                                                c_upd.execute(sql, params)
+                                        if self._auto_update:
+                                            if self._system == 'hosxp':
+                                                # 1) Update person with full fields and DATE() casts for date-only columns
+                                                sql_person = (
+                                                    "UPDATE person SET "
+                                                    "pttype=%s, "
+                                                    "pttype_begin_date=DATE(%s), "
+                                                    "pttype_expire_date=DATE(%s), "
+                                                    "pttype_hospmain=%s, "
+                                                    "pttype_hospsub=%s, "
+                                                    "pttype_no=%s, "
+                                                    "last_update_pttype=NOW() "
+                                                    "WHERE cid=%s"
+                                                )
+                                                params_person = [
+                                                    new_type or None,
+                                                    begin_date or None,
+                                                    expire_date or None,
+                                                    (hospmain_hcode or None),
+                                                    (hospsub_hcode or None),
+                                                    new_no or None,
+                                                    cid,
+                                                ]
+                                                print(f"[SQL UPDATE PERSON] {sql_person}")
+                                                print(f"[SQL PARAMS] {params_person}")
+                                                c_upd.execute(sql_person, params_person)
+                                                affected_rows = c_upd.rowcount
+                                                print(f"[AFFECTED ROWS] Person table: {affected_rows} rows")
                                                 db_conn.commit()
 
-                                            # Update today's visit by pid (JHCIS)
-                                            try:
-                                                pid_val = None
-                                                c_upd.execute("SELECT pid FROM person WHERE idcard=%s LIMIT 1", (cid,))
-                                                rpid = c_upd.fetchone()
-                                                if rpid and len(rpid) > 0:
-                                                    pid_val = rpid[0]
-                                                if pid_val is not None:
-                                                    sql_visit = (
-                                                        "UPDATE visit SET "
-                                                        "rightcode=%s, rightno=%s, hosmain=%s, hossub=%s, "
-                                                        "main_inscl=%s, sub_inscl=%s, dateupdate=NOW() "
-                                                        "WHERE pid=%s AND visitdate=CURDATE()"
-                                                    )
-                                                    params_visit = [
-                                                        (new_type or None),
-                                                        (new_no or None),
-                                                        (hospmain_hcode or None),
-                                                        (hospsub_hcode or None),
-                                                        (main_inscl_name or None),
-                                                        (sub_inscl_name or None),
-                                                        pid_val,
-                                                    ]
-                                                    c_upd.execute(sql_visit, params_visit)
+                                                # 2) Update patient (only existing columns) and bump last_update
+                                                sql_patient = (
+                                                    "UPDATE patient SET "
+                                                    "pttype=%s, pttype_no=%s, "
+                                                    "pttype_hospmain=%s, pttype_hospsub=%s, "
+                                                    "last_update=NOW() "
+                                                    "WHERE cid=%s"
+                                                )
+                                                params_patient = [
+                                                    new_type or None,
+                                                    new_no or None,
+                                                    (hospmain_hcode or None),
+                                                    (hospsub_hcode or None),
+                                                    cid,
+                                                ]
+                                                print(f"[SQL UPDATE PATIENT] {sql_patient}")
+                                                print(f"[SQL PARAMS] {params_patient}")
+                                                c_upd.execute(sql_patient, params_patient)
+                                                affected_rows = c_upd.rowcount
+                                                print(f"[AFFECTED ROWS] Patient table: {affected_rows} rows")
+                                                db_conn.commit()
+
+                                                # 3) Update today's ovst joined by patient.cid
+                                                sql_ovst = (
+                                                    "UPDATE ovst o "
+                                                    "JOIN patient p ON p.hn = o.hn "
+                                                    "SET o.pttype=%s, o.pttypeno=%s, o.hospmain=%s, o.hospsub=%s "
+                                                    "WHERE DATE(o.vstdate)=CURDATE() AND p.cid=%s"
+                                                )
+                                                params_ovst = [
+                                                    new_type or None,
+                                                    new_no or None,
+                                                    (hospmain_hcode or None),
+                                                    (hospsub_hcode or None),
+                                                    cid,
+                                                ]
+                                                print(f"[SQL UPDATE OVST] {sql_ovst}")
+                                                print(f"[SQL PARAMS] {params_ovst}")
+                                                c_upd.execute(sql_ovst, params_ovst)
+                                                affected_rows = c_upd.rowcount
+                                                print(f"[AFFECTED ROWS] OVST table: {affected_rows} rows")
+                                                db_conn.commit()
+                                            elif self._system == 'jhcis':
+                                                # Update person rights (JHCIS)
+                                                sets = []
+                                                params = []
+                                                if new_type:
+                                                    sets.append("rightcode=%s"); params.append(new_type)
+                                                if new_no:
+                                                    sets.append("rightno=%s"); params.append(new_no)
+                                                if hospmain_hcode is not None:
+                                                    sets.append("hosmain=%s"); params.append(hospmain_hcode)
+                                                if hospsub_hcode is not None:
+                                                    sets.append("hossub=%s"); params.append(hospsub_hcode)
+                                                if begin_date:
+                                                    sets.append("datestart=DATE(%s)"); params.append(begin_date)
+                                                if expire_date:
+                                                    sets.append("dateexpire=DATE(%s)"); params.append(expire_date)
+                                                if sets:
+                                                    sets.append("dateupdate=NOW()")
+                                                    params.append(cid)
+                                                    sql = "UPDATE person SET " + ", ".join(sets) + " WHERE idcard=%s"
+                                                    print(f"[SQL UPDATE PERSON JHCIS] {sql}")
+                                                    print(f"[SQL PARAMS] {params}")
+                                                    c_upd.execute(sql, params)
+                                                    affected_rows = c_upd.rowcount
+                                                    print(f"[AFFECTED ROWS] Person table (JHCIS): {affected_rows} rows")
                                                     db_conn.commit()
-                                            except Exception:
-                                                pass
-                            except Exception as e:
+
+                                                # Update today's visit by pid (JHCIS)
+                                                try:
+                                                    c_upd.execute("SELECT pid FROM person WHERE idcard=%s LIMIT 1", (cid,))
+                                                    rpid = c_upd.fetchone()
+                                                    if rpid and len(rpid) > 0:
+                                                        pid_val = rpid[0]
+                                                    if pid_val is not None:
+                                                        sql_visit = (
+                                                            "UPDATE visit SET "
+                                                            "rightcode=%s, rightno=%s, hosmain=%s, hossub=%s, "
+                                                            "main_inscl=%s, sub_inscl=%s, dateupdate=NOW() "
+                                                            "WHERE pid=%s AND visitdate=CURDATE()"
+                                                        )
+                                                        params_visit = [
+                                                            (new_type or None),
+                                                            (new_no or None),
+                                                            (hospmain_hcode or None),
+                                                            (hospsub_hcode or None),
+                                                            (main_inscl_name or None),
+                                                            (sub_inscl_name or None),
+                                                            pid_val,
+                                                        ]
+                                                        print(f"[SQL UPDATE VISIT JHCIS] {sql_visit}")
+                                                        print(f"[SQL PARAMS] {params_visit}")
+                                                        c_upd.execute(sql_visit, params_visit)
+                                                        affected_rows = c_upd.rowcount
+                                                        print(f"[AFFECTED ROWS] Visit table (JHCIS): {affected_rows} rows")
+                                                        db_conn.commit()
+                                                except Exception:
+                                                    pass
+                            except Exception:
                                 # fail-soft; continue processing other rows
+                                pass
                                 traceback.print_exc()
                             try:
                                 self.update_rights.emit(proxy_row, cid, new_type, new_no)
@@ -676,7 +716,7 @@ class Patient(QWidget, Patient_ui):
         self._pending_force = bool(force)
 
         self._thread = QThread(self)
-        self._worker = RightsWorker(system=system, patient_instance=self, debug=debug, force=force)
+        self._worker = RightsWorker(system=system, patient_instance=self, debug=debug, force=force, auto_update=auto_update)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
 
@@ -735,31 +775,34 @@ class Patient(QWidget, Patient_ui):
             ]
             summary_text = "\n".join(summary_lines)
             if token_expired:
-                # Notify token expired via status bar
                 try:
                     self._show_status("Token หมดอายุ กำลังรีเฟรชโทเคนอัตโนมัติ...", 7000)
                 except Exception:
                     pass
-                # Retry guard to avoid infinite loops
                 if not hasattr(self, '_retry_after_refresh'):
                     self._retry_after_refresh = False
                 if not self._retry_after_refresh:
                     self._retry_after_refresh = True
                     try:
-                        # Refresh token now
-                        from srm import refresh_token
                         refresh_token()
                     except Exception as ex:
+                        try:
+                            print(ex)
+                        except Exception:
+                            pass
                         try:
                             self._show_status(f"การขอ token ใหม่เกิดข้อผิดพลาด: {ex}", 7000)
                         except Exception:
                             pass
-                    else:
-                        # Continue after 5 seconds with the same pending rows
+                        # Try to open SRM program
                         try:
-                            self._show_status('รีเฟรชโทเคนสำเร็จ กำลังตรวจสอบสิทธิต่อใน 5 วินาที...', 7000)
+                            if open_srm_program():
+                                QMessageBox.warning(self, 'ล้มเหลว', f'{ex}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ\n\nโปรแกรม SRM ถูกเปิดขึ้นมาแล้ว')
+                            else:
+                                QMessageBox.warning(self, 'ล้มเหลว', f'{ex}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
                         except Exception:
-                            pass
+                            QMessageBox.warning(self, 'ล้มเหลว', f'{ex}\n\nโปรด Login ใน SRM ด้วยบัตรประชาชนของเจ้าหน้าที่ตรวจสอบสิทธิ')
+                    else:
                         QTimer.singleShot(5000, lambda: self._start_rights_worker(
                             getattr(self, '_pending_rows', []),
                             debug=getattr(self, '_pending_debug', False),

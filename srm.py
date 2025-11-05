@@ -1,6 +1,7 @@
 import os
 import json
 import traceback
+import subprocess
 from datetime import datetime
 from typing import Optional
 
@@ -273,5 +274,20 @@ def refresh_token():
         f.write("\n".join(out_lines) + "\n")
 
     return access_line.split('=', 1)[1]
+
+
+def open_srm_program():
+    """Open SRM Smart Card Single Sign-On program"""
+    srm_path = r"C:\Program Files (x86)\SRM Smart Card Single Sign-On\srm-scard-single-signon.exe"
+    try:
+        if os.path.exists(srm_path):
+            subprocess.Popen([srm_path])
+            return True
+        else:
+            print(f"SRM program not found at: {srm_path}")
+            return False
+    except Exception as e:
+        print(f"Failed to open SRM program: {e}")
+        return False
 
 
