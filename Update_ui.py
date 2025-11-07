@@ -30,15 +30,6 @@ class Update_ui(object):
         self.main_layout.setContentsMargins(20, 20, 20, 20)
         self.main_layout.setSpacing(12)
 
-        # Title
-        self.title_label = QLabel("อัปเดตโปรแกรม HisHelp", Update_ui)
-        title_font = QFont()
-        title_font.setPointSize(18)
-        title_font.setBold(True)
-        self.title_label.setFont(title_font)
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.main_layout.addWidget(self.title_label)
-
         # Current version block
         cur_title = QLabel("เวอร์ชันปัจจุบัน", Update_ui)
         cur_font = QFont()

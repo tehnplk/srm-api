@@ -47,61 +47,61 @@ class Update(QDialog, Update_ui):
     
 
     def _load_new_file(self):
-        new_path = 'new.txt'
+        new_path = 'new_ver.txt'
         if not os.path.exists(new_path):
-            self.lbl_status.setText("ไม่พบไฟล์ new.txt กรุณาตรวจสอบจากโปรแกรมหลัก")
+            self.lbl_status.setText("ไม่พบไฟล์ new_ver.txt กรุณาตรวจสอบจากโปรแกรมหลัก")
             return
         with open(new_path, 'r', encoding='utf-8') as f:
             raw = f.read()
         try:
             data = json.loads(raw)
         except Exception as e:
-            self.lbl_status.setText(f"อ่าน new.txt ไม่ได้: {e}")
+            self.lbl_status.setText(f"อ่าน new_ver.txt ไม่ได้: {e}")
             return
-        # Map keys from file (written by Main)
-        c_name = str(data.get('current_name') or '')
-        c_code = data.get('current_code')
-        c_release = str(data.get('current_release') or '')
-        r_name = str(data.get('new_version_name') or data.get('name') or '')
-        r_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
-        r_release_raw = str(data.get('release') or '')
-        r_release = r_release_raw[:10] if 'T' in r_release_raw and len(r_release_raw) >= 10 else r_release_raw
-        r_url = str(
-            data.get('download_url')
-            or data.get('download')
-            or data.get('url')
-            or ''
-        )
-        r_file_id = str(data.get('file_id') or '')
-        r_notes = str(data.get('notes') or data.get('changelog') or '')
+        # Map keys from file (written by Main) - use only new prefixed field names
+        project_name = str(data.get('project_name') or '')
+        current_name = str(data.get('current_version_name') or '')
+        current_code = data.get('current_version_code')
+        current_release = str(data.get('current_version_release') or '')
+        new_name = str(data.get('new_version_name') or '')
+        new_code = data.get('new_version_code')
+        new_release_raw = str(data.get('new_version_release') or '')
+        new_release = new_release_raw[:10] if 'T' in new_release_raw and len(new_release_raw) >= 10 else new_release_raw
+        new_url = str(data.get('new_version_download_url') or '')
+        new_file_id = str(data.get('new_version_file_id') or '')
+        new_notes = str(data.get('notes') or data.get('changelog') or '')
+
+        # Set window title using project name
+        if project_name:
+            self.setWindowTitle(f"{project_name} - อัปเดตโปรแกรม")
 
         # Populate UI
         cur_info = []
-        if c_name:
-            cur_info.append(f"เวอร์ชัน: {c_name}")
-        if c_code is not None and str(c_code) != '':
-            cur_info.append(f"โค้ด: {c_code}")
-        if c_release:
-            cur_info.append(f"เผยแพร่: {c_release}")
+        if current_name:
+            cur_info.append(f"Version: {current_name}")
+        if current_code is not None and str(current_code) != '':
+            cur_info.append(f"Code: {current_code}")
+        if current_release:
+            cur_info.append(f"Release: {current_release}")
         self.lbl_cur.setText("  |  ".join(cur_info) if cur_info else "-")
 
         new_info = []
-        if r_name:
-            new_info.append(f"เวอร์ชัน: {r_name}")
-        if r_code is not None and str(r_code) != '':
-            new_info.append(f"โค้ด: {r_code}")
-        if r_release:
-            new_info.append(f"เผยแพร่: {r_release}")
-        self.lbl_new.setText("  |  ".join(new_info) if new_info else "ไม่พบข้อมูลเวอร์ชันใหม่")
-        self.lbl_notes.setText(r_notes)
-        self.remote_download_url = r_url
-        self.remote_file_id = r_file_id
-        can_download = bool(r_url) or bool(r_file_id)
+        if new_name:
+            new_info.append(f"Version: {new_name}")
+        if new_code is not None and str(new_code) != '':
+            new_info.append(f"Code: {new_code}")
+        if new_release:
+            new_info.append(f"Release: {new_release}")
+        self.lbl_new.setText("  |  ".join(new_info) if new_info else "No new version information found")
+        self.lbl_notes.setText(new_notes)
+        self.remote_download_url = new_url
+        self.remote_file_id = new_file_id
+        can_download = bool(new_url) or bool(new_file_id)
         self.btn_open.setEnabled(can_download)
         if can_download:
-            self.lbl_status.setText("พร้อมดาวน์โหลดและติดตั้ง")
+            self.lbl_status.setText("Ready to download and install")
         else:
-            self.lbl_status.setText("ไม่พบลิงก์ดาวน์โหลดหรือ file_id ใน new.txt")
+            self.lbl_status.setText("No download link or file_id found in new_ver.txt")
 
     def _cleanup_thread(self):
         self.btn_check.setEnabled(True)
@@ -114,42 +114,37 @@ class Update(QDialog, Update_ui):
 
     def _on_update_finished(self, data: dict):
         print(f"[UPDATE] Finished with data: {data}")
-        # Map possible keys
-        r_name = str(data.get('new_version_name') or data.get('name') or '')
-        r_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
-        r_release_raw = str(data.get('release') or '')
-        r_release = r_release_raw[:10] if 'T' in r_release_raw and len(r_release_raw) >= 10 else r_release_raw
-        r_url = str(
-            data.get('download_url')
-            or data.get('download')
-            or data.get('url')
-            or ''
-        )
-        r_notes = str(data.get('notes') or data.get('changelog') or '')
-        print(f"[UPDATE] Parsed remote -> name={r_name!r} code={r_code!r} release={r_release!r} url={r_url!r}")
+        # Map possible keys - use only new prefixed field names
+        new_name = str(data.get('new_version_name') or '')
+        new_code = data.get('new_version_code')
+        new_release_raw = str(data.get('new_version_release') or '')
+        new_release = new_release_raw[:10] if 'T' in new_release_raw and len(new_release_raw) >= 10 else new_release_raw
+        new_url = str(data.get('new_version_download_url') or '')
+        new_notes = str(data.get('notes') or data.get('changelog') or '')
+        print(f"[UPDATE] Parsed remote -> name={new_name!r} code={new_code!r} release={new_release!r} url={new_url!r}")
 
         # Update UI with remote info
         new_info = []
-        if r_name:
-            new_info.append(f"เวอร์ชัน: {r_name}")
-        if r_code is not None and str(r_code) != '':
-            new_info.append(f"โค้ด: {r_code}")
-        if r_release:
-            new_info.append(f"เผยแพร่: {r_release}")
-        self.lbl_new.setText("  |  ".join(new_info) if new_info else "ไม่พบข้อมูลเวอร์ชันใหม่")
-        self.lbl_notes.setText(r_notes)
-        self.remote_download_url = r_url
+        if new_name:
+            new_info.append(f"Version: {new_name}")
+        if new_code is not None and str(new_code) != '':
+            new_info.append(f"Code: {new_code}")
+        if new_release:
+            new_info.append(f"Release: {new_release}")
+        self.lbl_new.setText("  |  ".join(new_info) if new_info else "No new version information found")
+        self.lbl_notes.setText(new_notes)
+        self.remote_download_url = new_url
         # Decide if newer
-        is_newer = self._is_newer(r_code, r_name)
+        is_newer = self._is_newer(new_code, new_name)
         # Enable download only when newer and URL is available
-        can_download = bool(r_url) and is_newer
+        can_download = bool(new_url) and is_newer
         self.btn_open.setEnabled(can_download)
-        if not r_url:
-            self.lbl_status.setText("ไม่พบลิงก์ดาวน์โหลด")
+        if not new_url:
+            self.lbl_status.setText("No download link found")
         elif not is_newer:
-            self.lbl_status.setText("เป็นเวอร์ชันล่าสุดแล้ว ไม่จำเป็นต้องดาวน์โหลด")
+            self.lbl_status.setText("Already the latest version - no need to download")
         else:
-            self.lbl_status.setText("พร้อมดาวน์โหลดและติดตั้ง")
+            self.lbl_status.setText("Ready to download and install")
 
         # Also show quick status dialog
         # is_newer already computed above

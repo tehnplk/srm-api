@@ -1,0 +1,11 @@
+{
+  "project_name": "HisHelp",
+  "new_version_code": 4,
+  "new_version_name": "1.0.1",
+  "new_version_release": "2025-10-29T17:00:00.000Z",
+  "new_version_file_id": "l78523655",
+  "new_version_download_url": "",
+  "current_version_code": 3,
+  "current_version_name": "1.0.2",
+  "current_version_release": "2025-11-05"
+}

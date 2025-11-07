@@ -3,7 +3,7 @@ import traceback
 import os
 import json
 import requests
-from Version import NAME as APP_VERSION_NAME, RELEASE as APP_VERSION_RELEASE, CODE as APP_VERSION_CODE
+from Version import NAME as APP_VERSION_NAME, RELEASE as APP_VERSION_RELEASE, CODE as APP_VERSION_CODE, PROJECT as APP_PROJECT
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMdiSubWindow, QMessageBox
 from PyQt6.QtCore import Qt, QProcess
 from PyQt6.QtGui import QIcon
@@ -154,7 +154,7 @@ class Main(QMainWindow, Main_ui):
                 except Exception as e:
                     traceback.print_exc()
                     try:
-                        data = max(payload, key=lambda x: str((x or {}).get('release') or ''))
+                        data = max(payload, key=lambda x: str((x or {}).get('new_version_release') or (x or {}).get('release') or ''))
                     except Exception as e:
                         traceback.print_exc()
                         data = payload[-1]
@@ -177,24 +177,32 @@ class Main(QMainWindow, Main_ui):
             QMessageBox.information(self, "อัปเดต", "เป็นเวอร์ชันล่าสุดแล้ว")
             return
 
-        # If newer, write new.txt (JSON) using a simple relative path
-        new_path = 'new.txt'
+        # If newer, write new_ver.txt (JSON) using a simple relative path
+        new_path = 'new_ver.txt'
         try:
             # augment payload with current version info
-            data_out = dict(data)
-            data_out['current_code'] = cur_code
+            data_out = {}
+            data_out['project_name'] = str(APP_PROJECT)
+            # Copy new version fields from API data
+            data_out['new_version_code'] = data.get('new_version_code')
+            data_out['new_version_name'] = data.get('new_version_name')
+            data_out['new_version_release'] = data.get('new_version_release')
+            data_out['new_version_file_id'] = data.get('new_version_file_id')
+            data_out['new_version_download_url'] = data.get('new_version_download_url')
+            # Add current version info
+            data_out['current_version_code'] = cur_code
             try:
-                data_out['current_name'] = str(APP_VERSION_NAME)
+                data_out['current_version_name'] = str(APP_VERSION_NAME)
             except Exception as e:
                 traceback.print_exc()
             try:
-                data_out['current_release'] = str(APP_VERSION_RELEASE)
+                data_out['current_version_release'] = str(APP_VERSION_RELEASE)
             except Exception as e:
                 traceback.print_exc()
             with open(new_path, 'w', encoding='utf-8') as f:
-                json.dump(data_out, f, ensure_ascii=False)
+                json.dump(data_out, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            QMessageBox.warning(self, "อัปเดต", f"ไม่สามารถเขียนไฟล์ new.txt: {e}")
+            QMessageBox.warning(self, "อัปเดต", f"ไม่สามารถเขียนไฟล์ new_ver.txt: {e}")
             return
 
         # Offer to start Update.exe to download and install (show new version details, exclude URL)
@@ -206,7 +214,7 @@ class Main(QMainWindow, Main_ui):
         # Build detail message
         new_name = str(data.get('new_version_name') or data.get('name') or '')
         new_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
-        rel_raw = str(data.get('release') or '')
+        rel_raw = str(data.get('new_version_release') or data.get('release') or '')
         rel_fmt = rel_raw[:10] if 'T' in rel_raw and len(rel_raw) >= 10 else rel_raw
         notes = str(data.get('notes') or data.get('changelog') or '')
         details = []
