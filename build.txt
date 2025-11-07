@@ -1,1 +1,0 @@
-pyinstaller --clean --onefile -w --name HisHelp --icon check.ico --add-data "check.png;." Main.py
