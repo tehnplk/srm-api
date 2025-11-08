@@ -108,12 +108,32 @@ class Update(QDialog, Update_ui):
         self.lbl_notes.setText(new_notes)
         self.remote_download_url = new_url
         self.remote_file_id = new_file_id
-        can_download = bool(new_url) or bool(new_file_id)
+        
+        # Compare versions to determine if download should be enabled
+        is_newer = self._is_newer(new_code, current_code)
+        can_download = (bool(new_url) or bool(new_file_id)) and is_newer
+        
         self.btn_open.setEnabled(can_download)
         if can_download:
             self.lbl_status.setText("Ready to download and install")
-        else:
+        elif not (bool(new_url) or bool(new_file_id)):
             self.lbl_status.setText("No download link or file_id found in new_ver.txt")
+        else:
+            self.lbl_status.setText("Already the latest version - no need to download")
+
+    def _is_newer(self, new_code, current_code):
+        """Compare version codes to determine if new version is newer"""
+        try:
+            if new_code is None or current_code is None:
+                return False
+            new_code = int(str(new_code)) if str(new_code).strip() != '' else None
+            current_code = int(str(current_code)) if str(current_code).strip() != '' else None
+            if new_code is None or current_code is None:
+                return False
+            return new_code > current_code
+        except Exception as e:
+            traceback.print_exc()
+            return False
 
     def _cleanup_thread(self):
         self.btn_check.setEnabled(True)
@@ -146,8 +166,19 @@ class Update(QDialog, Update_ui):
         self.lbl_new.setText("  |  ".join(new_info) if new_info else "No new version information found")
         self.lbl_notes.setText(new_notes)
         self.remote_download_url = new_url
+        
+        # Get current version from new_ver.txt for comparison
+        current_code = None
+        try:
+            if os.path.exists('new_ver.txt'):
+                with open('new_ver.txt', 'r', encoding='utf-8') as f:
+                    current_data = json.loads(f.read())
+                    current_code = current_data.get('current_version_code')
+        except Exception as e:
+            traceback.print_exc()
+        
         # Decide if newer
-        is_newer = self._is_newer(new_code, new_name)
+        is_newer = self._is_newer(new_code, current_code)
         # Enable download only when newer and URL is available
         can_download = bool(new_url) and is_newer
         self.btn_open.setEnabled(can_download)
@@ -159,8 +190,7 @@ class Update(QDialog, Update_ui):
             self.lbl_status.setText("Ready to download and install")
 
         # Also show quick status dialog
-        # is_newer already computed above
-        print(f"[UPDATE] Compare -> current name={CUR_NAME!r} code={CUR_CODE!r} vs remote; newer={is_newer}")
+        print(f"[UPDATE] Compare -> current code={current_code!r} vs new code={new_code!r}; newer={is_newer}")
         if is_newer:
             QMessageBox.information(self, "พบอัปเดต", "มีเวอร์ชันใหม่พร้อมใช้งาน")
         else:
