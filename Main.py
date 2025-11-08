@@ -173,11 +173,7 @@ class Main(QMainWindow, Main_ui):
             traceback.print_exc()
             cur_code = None
 
-        if new_code is None or cur_code is None or not (new_code > cur_code):
-            QMessageBox.information(self, "อัปเดต", "เป็นเวอร์ชันล่าสุดแล้ว")
-            #return
-
-        # If newer, write new_ver.txt (JSON) using a simple relative path
+        # Write API response to new_ver.txt immediately after receiving it
         new_path = 'new_ver.txt'
         try:
             # augment payload with current version info
@@ -205,6 +201,10 @@ class Main(QMainWindow, Main_ui):
                 json.dump(data_out, f, ensure_ascii=False, indent=2)
         except Exception as e:
             QMessageBox.warning(self, "อัปเดต", f"ไม่สามารถเขียนไฟล์ new_ver.txt: {e}")
+            return
+
+        if new_code is None or cur_code is None or not (new_code > cur_code):
+            QMessageBox.information(self, "อัปเดต", "เป็นเวอร์ชันล่าสุดแล้ว")
             return
 
         # Offer to start Update.exe to download and install (show new version details, exclude URL)
