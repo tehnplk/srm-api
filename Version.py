@@ -1,6 +1,6 @@
 PROJECT = "HisHelp"
-CODE = "4"
-NAME = "1.0.3"
-RELEASE = "2025-11-07"
+CODE = "7"
+NAME = "1.0.5"
+RELEASE = "2025-11-08"
 
 __all__ = ["PROJECT", "CODE", "NAME", "RELEASE"]

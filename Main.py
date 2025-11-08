@@ -175,7 +175,7 @@ class Main(QMainWindow, Main_ui):
 
         if new_code is None or cur_code is None or not (new_code > cur_code):
             QMessageBox.information(self, "อัปเดต", "เป็นเวอร์ชันล่าสุดแล้ว")
-            return
+            #return
 
         # If newer, write new_ver.txt (JSON) using a simple relative path
         new_path = 'new_ver.txt'
@@ -199,6 +199,8 @@ class Main(QMainWindow, Main_ui):
                 data_out['current_version_release'] = str(APP_VERSION_RELEASE)
             except Exception as e:
                 traceback.print_exc()
+            # Add app_file field
+            data_out['app_file'] = 'HisHelp.exe'
             with open(new_path, 'w', encoding='utf-8') as f:
                 json.dump(data_out, f, ensure_ascii=False, indent=2)
         except Exception as e:
