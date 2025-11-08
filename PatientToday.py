@@ -115,7 +115,7 @@ class PatientToday(QWidget, PatientToday_ui):
                     p.lname,
                     COALESCE(o.pttype, p.pttype) AS pttype,
                     COALESCE(o.pttypeno, p.pttype_no) AS pttype_no,
-                    COALESCE(o.last_update, p.last_update) AS last_update_right
+                    p.last_update AS last_update_right
                 FROM ovst o
                 JOIN patient p ON p.hn = o.hn
                 WHERE DATE(o.vstdate) = %s
