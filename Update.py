@@ -21,6 +21,7 @@ from Update_ui import Update_ui
 class Update(QDialog, Update_ui):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.version = '1.0.1'
         self.setupUi(self)
         self.remote_download_url = ""
         self.remote_file_id = ""
@@ -41,6 +42,16 @@ class Update(QDialog, Update_ui):
         self.btn_open.setEnabled(False)
         # Load new.txt to get URL and info
         self._load_new_file()
+
+    def closeEvent(self, event):
+        """Override close event to ensure proper application termination"""
+        # Clean up any running threads
+        if self._thread and self._thread.isRunning():
+            self._thread.quit()
+            self._thread.wait()
+        # Accept the close event to properly close the application
+        event.accept()
+        QApplication.quit()
 
     
 
@@ -73,7 +84,8 @@ class Update(QDialog, Update_ui):
 
         # Set window title using project name
         if project_name:
-            self.setWindowTitle(f"{project_name} - อัปเดตโปรแกรม")
+            self.setWindowTitle(f"Update System {self.version}")
+            self.lbl_project_name.setText(project_name)
 
         # Populate UI
         cur_info = []
@@ -253,17 +265,8 @@ class _DownloadWorker(QObject):
 
             self.status.emit("ดาวน์โหลดเสร็จ กำลังแตกไฟล์...")
 
-            app_dir = os.path.dirname(os.path.abspath(__file__))
-            extract_dir = os.path.join(app_dir, 'update_package')
-            if os.path.exists(extract_dir):
-                try:
-                    import shutil
-                    shutil.rmtree(extract_dir, ignore_errors=True)
-                except Exception as e:
-                    traceback.print_exc()
-            os.makedirs(extract_dir, exist_ok=True)
             with zipfile.ZipFile(tmp_path, 'r') as zf:
-                zf.extractall(extract_dir)
+                zf.extractall("./")
 
             try:
                 os.remove(tmp_path)
@@ -271,7 +274,7 @@ class _DownloadWorker(QObject):
                 traceback.print_exc()
 
             self.progress.emit(100)
-            self.finished.emit(f"ดาวน์โหลดและแตกไฟล์เสร็จแล้ว: {extract_dir}")
+            self.finished.emit(f"ดาวน์โหลดและแตกไฟล์เสร็จแล้ว: ./")
         except Exception as e:
             import traceback
             traceback.print_exc()

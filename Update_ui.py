@@ -30,6 +30,16 @@ class Update_ui(object):
         self.main_layout.setContentsMargins(20, 20, 20, 20)
         self.main_layout.setSpacing(12)
 
+        # Project name label (large)
+        self.lbl_project_name = QLabel("", Update_ui)
+        project_font = QFont()
+        project_font.setPointSize(18)
+        project_font.setBold(True)
+        self.lbl_project_name.setFont(project_font)
+        self.lbl_project_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_project_name.setStyleSheet("color: #2c3e50; margin-bottom: 10px;")
+        self.main_layout.addWidget(self.lbl_project_name)
+
         # Current version block
         cur_title = QLabel("เวอร์ชันปัจจุบัน", Update_ui)
         cur_font = QFont()
@@ -68,6 +78,7 @@ class Update_ui(object):
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         self.progress.setTextVisible(True)
+        self.progress.setFormat("%v%")
         self.progress.setStyleSheet(
             "QProgressBar {height: 18px; border: 1px solid #bdc3c7; border-radius: 6px; background: #ecf0f1;}"
             "QProgressBar::chunk {background-color: #27ae60; border-radius: 6px;}"
