@@ -28,7 +28,10 @@ class Main(QMainWindow, Main_ui):
         try:
             v_name = str(APP_VERSION_NAME or "").strip()
             v_rel = str(APP_VERSION_RELEASE or "").strip()
+            v_code = str(APP_VERSION_CODE or "").strip()
             title_extra = f" v{v_name}" if v_name else ""
+            if v_code:
+                title_extra += f"[{v_code}]"
             if v_rel:
                 title_extra += f" ({v_rel})"
             self.setWindowTitle(f"HisHelp{title_extra}")
@@ -204,7 +207,44 @@ class Main(QMainWindow, Main_ui):
             return
 
         if new_code is None or cur_code is None or not (new_code > cur_code):
-            QMessageBox.information(self, "อัปเดต", "เป็นเวอร์ชันล่าสุดแล้ว")
+            # Build 'current' section from app's current version
+            c_name = str(APP_VERSION_NAME or '').strip()
+            c_code = str(APP_VERSION_CODE or '').strip()
+            c_rel = str(APP_VERSION_RELEASE or '').strip()
+            cur_lines = []
+            if c_name:
+                cur_lines.append(f"เวอร์ชัน: {c_name}")
+            if c_code:
+                cur_lines.append(f"โค้ด: {c_code}")
+            if c_rel:
+                cur_lines.append(f"เผยแพร่: {c_rel}")
+
+            # Build 'new' section from the selected record
+            l_name = str(data.get('new_version_name') or data.get('name') or '')
+            l_code = data.get('new_version_code') if 'new_version_code' in data else data.get('code')
+            l_rel_raw = str(data.get('new_version_release') or data.get('release') or '')
+            l_rel = l_rel_raw[:10] if 'T' in l_rel_raw and len(l_rel_raw) >= 10 else l_rel_raw
+            l_notes = str(data.get('notes') or data.get('changelog') or '')
+            new_lines = []
+            if l_name:
+                new_lines.append(f"เวอร์ชัน: {l_name}")
+            if l_code is not None and str(l_code) != '':
+                new_lines.append(f"โค้ด: {l_code}")
+            if l_rel:
+                new_lines.append(f"เผยแพร่: {l_rel}")
+            if l_notes:
+                new_lines.append("")
+                new_lines.append(l_notes)
+
+            sections = []
+            if cur_lines:
+                sections.append("current\n---------\n" + "\n".join(cur_lines))
+            if new_lines:
+                sections.append("new\n---------\n" + "\n".join(new_lines))
+            msg = "เป็นเวอร์ชันล่าสุดแล้ว"
+            if sections:
+                msg += "\n\n" + "\n\n".join(sections)
+            QMessageBox.information(self, "อัปเดต", msg)
             return
 
         # Offer to start Update.exe to download and install (show new version details, exclude URL)
@@ -230,11 +270,28 @@ class Main(QMainWindow, Main_ui):
             details.append("")
             details.append(notes)
         body = "\n".join(details)
-
+        # Compose sections: current vs new
+        c_name = str(APP_VERSION_NAME or '').strip()
+        c_code = str(APP_VERSION_CODE or '').strip()
+        c_rel = str(APP_VERSION_RELEASE or '').strip()
+        cur_lines = []
+        if c_name:
+            cur_lines.append(f"เวอร์ชัน: {c_name}")
+        if c_code:
+            cur_lines.append(f"โค้ด: {c_code}")
+        if c_rel:
+            cur_lines.append(f"เผยแพร่: {c_rel}")
+        composed = []
+        if cur_lines:
+            composed.append("current\n---------\n" + "\n".join(cur_lines))
+        if body:
+            composed.append("new\n---------\n" + body)
+        composed_body = "\n\n".join(composed)
         ret = QMessageBox.question(
             self,
             "พบอัปเดต",
-            (body + ("\n\n" if body else "")) + "ต้องการดาวน์โหลดและติดตั้งเดี๋ยวนี้หรือไม่?",
+            (composed_body + ("\n\n" if composed_body else ""))
+            + "ต้องการดาวน์โหลดและติดตั้งเดี๋ยวนี้หรือไม่?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if ret == QMessageBox.StandardButton.Yes:
