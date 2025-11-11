@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QHBoxLayout,
+    QSizePolicy,
 )
 from PyQt6.QtGui import QAction, QIcon, QFont, QPainter, QPixmap, QColor, QBrush, QPalette
 from PyQt6.QtCore import Qt, QSize
@@ -267,6 +268,14 @@ class Main_ui(object):
 
         # Keep Settings action on toolbar
         self.toolBar.addAction(self.actionSetting)
+
+        # Add spacer to push Check Update button to the right
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.toolBar.addWidget(spacer)
+
+        # Add Check Update action to toolbar (right-aligned)
+        self.toolBar.addAction(self.actionCheckUpdate)
 
         # Create status bar
         self.statusbar = QStatusBar(MainWindow)

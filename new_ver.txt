@@ -1,12 +1,12 @@
 {
   "project_name": "HisHelp",
-  "new_version_code": 7,
-  "new_version_name": "1.0.5",
-  "new_version_release": "2025-11-08T17:00:00.000Z",
-  "new_version_file_id": "1_k8RRfs9AFs6hcDQhaNRWBGhfhgsCtYn",
+  "new_version_code": 9,
+  "new_version_name": "1.0.7",
+  "new_version_release": "2025-11-11",
+  "new_version_file_id": "",
   "new_version_download_url": "",
-  "current_version_code": 7,
-  "current_version_name": "1.0.5",
-  "current_version_release": "2025-11-08",
+  "current_version_code": 9,
+  "current_version_name": "1.0.7",
+  "current_version_release": "2025-11-11",
   "app_file": "HisHelp.exe"
 }
